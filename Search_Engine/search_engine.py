@@ -38,7 +38,7 @@ def run_engine():
 
         print(number_of_documents)
         # parse the document
-        ##parsed_document = p.parse_doc(document)
+        parsed_document = p.parse_doc(document)
         number_of_documents += 1
         # index the document data
        ## indexer.add_new_doc(parsed_document)

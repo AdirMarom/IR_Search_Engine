@@ -10,4 +10,4 @@ if __name__ == '__main__':
     b = parser_module.Parse.percent_parse("5 PERCENT")
     b = parser_module.Parse.percent_parse("5 PERCENTAGE")
     c=2
-   ### search_engine.main()
+    search_engine.main()

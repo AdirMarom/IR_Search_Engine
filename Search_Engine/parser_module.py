@@ -35,7 +35,13 @@ class Parse:
         quote_text = doc_as_list[6]
         quote_url = doc_as_list[7]
         term_dict = {}
+        full_text=self.Hashtags_parse(full_text)
+        full_text = self.percent_parse(full_text)
+        retweet_url = self.parse_url(retweet_url)
+        url = self.parse_url(url)
+        quote_url = self.parse_url(quote_url)
         tokenized_text = self.parse_sentence(full_text)
+
 
         doc_length = len(tokenized_text)  # after text operations.
 
@@ -119,25 +125,35 @@ class Parse:
             elif (num.isdigit() and units == "Billion"):
                 return num + "B"
 
-    def Hashtags_parse(tag):
+    def Hashtags_parse(text):
         """
         This function takes a  Hashtag world from document and break it into to list of word
         :param tag: Hashtag word from tweet.
         :return: list include spread world and #tag .
         """
-        if(tag.find('#')<0):
-            return
-        str.index(tag,'#')
-        strToParse=tag[str.index(tag,'#')+1:]
-        flag=strToParse.find('_')
-        if flag>-1:
-            parseList = re.sub(r"([^a-zA-Z])", r" \1", strToParse)
-            parseList=str.replace(parseList,'_','')
+        lst=str.split(text," ")
+        count=0
+        for term in lst:
+            count+=1
+            tag=term
+            if(tag[0]!='#'):
+                continue
+            strToParse=tag[1:]
+            flag=strToParse.find('_')
+            if flag>-1:
+                parseList = re.sub(r"([^a-zA-Z])", r" \1", strToParse)
+                parseList=str.replace(parseList,'_','')
 
+            else:
+                parseList = re.sub(r"([A-Z])", r" \1", strToParse)
+            parseList = parseList.lower()
+            split_tag= str.split(parseList, " ") + ['#' + strToParse]
+        if(count==len(lst)):
+            lst+=split_tag
         else:
-            parseList = re.sub(r"([A-Z])", r" \1", strToParse)
-        parseList = parseList.lower()
-        return str.split(parseList, " ") +['#'+strToParse]
+            lst= lst[:count]+split_tag+lst[count]
+        return ' '.join(map(str,lst))
+
 
     def percent_parse(strToParse):
         """
