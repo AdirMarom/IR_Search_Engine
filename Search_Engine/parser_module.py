@@ -91,39 +91,60 @@ class Parse:
             return True
         return False
 
-    def fix_number(number):
-        """
-        This function change the representation of Number,10,000->10K ,10,123->10.123K
-                                                            1,123,000->1.123M
-                                                            1,123,000,000->1.123B
-        :param number:  num from tweet.
-        :return:string in Format  Number% .
-        """
-        data_num = number.split(' ')
-        if (len(data_num) == 1):
-            num = data_num[0]
-            num = num.replace(',', '')
-            if (num.isdigit()):
-                num = int(num)
-                if (1000 <= num < 1000000):
-                    num = num / 1000
-                    return "%.3f" % num + "K"
-                elif (1000000 <= num < 1000000000):
-                    num = num / 1000000
-                    return "%.3f" % num + "M"
-                elif (num > 1000000000):
-                    num = num / 1000000000
-                    return "%.3f" % num + "B"
 
-        if (len(data_num) == 2):
-            num = data_num[0]
-            units = data_num[1]
-            if (num.isdigit() and units == "Thousand"):
-                return num + "K"
-            elif (num.isdigit() and units == "Million"):
-                return num + "M"
-            elif (num.isdigit() and units == "Billion"):
-                return num + "B"
+
+
+        def fix_number(sentence):
+            """
+                    This function change the representation of Number,10,000->10K ,10,123->10.123K
+                                                                        1,123,000->1.123M
+                                                                        1,123,000,000->1.123B
+                    :param number:  num from tweet.
+                    :return:string in Format  Number% .
+                    """
+            sentence = sentence.split(' ')
+            for i in range(len(sentence)):
+                if (re.search(r"\d", sentence[i])):
+                    if (i + 1 != len(sentence) and sentence[i + 1] != "Thousand" and sentence[i + 1] != "Million" and
+                            sentence[i + 1] != "Billion"):
+                        num = sentence[i]
+                        num = num.replace(',', '')
+                        first_num = float(num)
+                        if (num.isdigit()):
+                            num = float(num)
+                            if (1000 <= num < 1000000):
+                                num = num / 1000
+                                sentence[i] = "%.3f" % num + "K"
+
+                            elif (1000000 <= num < 1000000000):
+                                num = num / 1000000
+                                sentence[i] = "%.3f" % num + "M"
+                            elif (num > 1000000000):
+                                sentence[i] = num / 1000000000
+                                sentence[i] = "%.3f" % num + "B"
+                            if (sentence[i][-2] == '0'):
+                                sentence[i] = sentence[i][0:-2] + sentence[i][-1]
+                                if (sentence[i][-2] == '0'):
+                                    sentence[i] = sentence[i][0:-2] + sentence[i][-1]
+                                    if (sentence[i][-2] == '0'):
+                                        sentence[i] = sentence[i][0:-2] + sentence[i][-1]
+                                        if (sentence[i][-2] == '.'):
+                                            sentence[i] = sentence[i][0:-2] + sentence[i][-1]
+
+                    if (i + 1 == len(sentence)):
+                        break
+                    else:
+                        if (sentence[i + 1] == "Thousand"):
+                            sentence[i] += "K"
+                            sentence[i + 1] = ""
+                        elif (sentence[i + 1] == "Million"):
+                            sentence[i] += "M"
+                            sentence[i + 1] = ""
+                        elif (sentence[i + 1] == "Billion"):
+                            sentence[i] += "B"
+                            sentence[i + 1] = ""
+
+            sentence = ' '.join(map(str, sentence))
 
     def Hashtags_parse(text):
         """
