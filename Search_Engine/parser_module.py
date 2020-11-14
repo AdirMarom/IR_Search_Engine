@@ -1,5 +1,4 @@
 from urllib.parse import urlparse
-
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from document import Document
@@ -35,14 +34,11 @@ class Parse:
         quote_text = doc_as_list[6]
         quote_url = doc_as_list[7]
         term_dict = {}
-        full_text=self.Hashtags_parse(full_text)
-        full_text = self.percent_parse(full_text)
         retweet_url = self.parse_url(retweet_url)
         url = self.parse_url(url)
         quote_url = self.parse_url(quote_url)
+        full_text=self.advance_parse(full_text)
         tokenized_text = self.parse_sentence(full_text)
-
-
         doc_length = len(tokenized_text)  # after text operations.
 
         for term in tokenized_text:
@@ -55,7 +51,14 @@ class Parse:
                             quote_url, term_dict, doc_length)
         return document
 
-    def parse_url(url_string):
+    def advance_parse(self,full_text):
+        full_text=self.Hashtags_parse(full_text)
+        full_text = self.percent_parse(full_text)
+        full_text=self.fix_number(full_text)
+        return full_text
+
+
+    def parse_url(self,url_string):
         """
         This function takes a  url_string from document and break it into to list of word :
         https://www.instagram.com/p/CD7fAPWs3WM/?igshid=o9kf0ugp1l8x ->[https, www, instagram.com, p, CD7fAPWs3WM, igshid, o9kf0ugp1l8x ]
@@ -84,9 +87,9 @@ class Parse:
             if (query[j] != ''):
                 lst.append(query[j])
 
-        return lst
+        return ' '.join(map(str, lst))
 
-    def is_tag(word):
+    def is_tag(self,word):
         if (word.startswith('@') and len(word) > 1):
             return True
         return False
@@ -146,7 +149,7 @@ class Parse:
 
             sentence = ' '.join(map(str, sentence))
 
-    def Hashtags_parse(text):
+    def Hashtags_parse(self,text):
         """
         This function takes a  Hashtag world from document and break it into to list of word
         :param tag: Hashtag word from tweet.
@@ -168,15 +171,16 @@ class Parse:
             else:
                 parseList = re.sub(r"([A-Z])", r" \1", strToParse)
             parseList = parseList.lower()
-            split_tag= str.split(parseList, " ") + ['#' + strToParse]
-        if(count==len(lst)):
-            lst+=split_tag
-        else:
-            lst= lst[:count]+split_tag+lst[count]
-        return ' '.join(map(str,lst))
+            secparseList= parseList.replace(' ','')
+            split_tag= str.split(parseList, " ") + ['#' + secparseList]
+            if(count==len(lst)):
+                lst=lst[:len(lst)-1]+split_tag
+            else:
+                lst= lst[:count]+split_tag+lst[count]
+        lst= ' '.join(map(str,lst))
+        return lst
 
-
-    def percent_parse(strToParse):
+    def percent_parse(self,strToParse):
         """
         This function change the representation of Number%,Number percent,Number percentage to Number%
         :param s:  word from tweet.
@@ -189,5 +193,56 @@ class Parse:
         strToParse = str.replace(strToParse, ' percent', '%')
         return strToParse
 
+    def fix_number(self,sentence):
+        """
+                This function change the representation of Number,10,000->10K ,10,123->10.123K
+                                                                    1,123,000->1.123M
+                                                                    1,123,000,000->1.123B
+                :param number:  num from tweet.
+                :return:string in Format  Number% .
+                """
+        sentence = sentence.split(' ')
+        for i in range(len(sentence)):
+            if (re.search(r"\d", sentence[i])):
+                if (i + 1 != len(sentence) and sentence[i + 1] != "Thousand" and sentence[i + 1] != "Million" and
+                        sentence[i + 1] != "Billion"):
+                    num = sentence[i]
+                    num = num.replace(',', '')
+                    first_num = float(num)
+                    if (num.isdigit()):
+                        num = float(num)
+                        if (1000 <= num < 1000000):
+                            num = num / 1000
+                            sentence[i] = "%.3f" % num + "K"
+
+                        elif (1000000 <= num < 1000000000):
+                            num = num / 1000000
+                            sentence[i] = "%.3f" % num + "M"
+                        elif (num > 1000000000):
+                            sentence[i] = num / 1000000000
+                            sentence[i] = "%.3f" % num + "B"
+                        if (sentence[i][-2] == '0'):
+                            sentence[i] = sentence[i][0:-2] + sentence[i][-1]
+                            if (sentence[i][-2] == '0'):
+                                sentence[i] = sentence[i][0:-2] + sentence[i][-1]
+                                if (sentence[i][-2] == '0'):
+                                    sentence[i] = sentence[i][0:-2] + sentence[i][-1]
+                                    if (sentence[i][-2] == '.'):
+                                        sentence[i] = sentence[i][0:-2] + sentence[i][-1]
+
+                if (i + 1 == len(sentence)):
+                    break
+                else:
+                    if (sentence[i + 1] == "Thousand"):
+                        sentence[i] += "K"
+                        sentence[i + 1] = ""
+                    elif (sentence[i + 1] == "Million"):
+                        sentence[i] += "M"
+                        sentence[i + 1] = ""
+                    elif (sentence[i + 1] == "Billion"):
+                        sentence[i] += "B"
+                        sentence[i + 1] = ""
+
+        return ' '.join(map(str, sentence))
 
 
