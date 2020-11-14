@@ -28,8 +28,6 @@ def run_engine():
         for inner_entry in entry.iterdir():
             if (Path(inner_entry).suffix == '.parquet'):
                 doc_list.append(inner_entry);
-                df = spark.read.parquet(inner_entry)
-                df.write.csv("C:\\Users\\adirm\\Desktop\\GIT_Folder\\outfile.csv")
 
     for i in range (len(doc_list)):
         tmp_list=r.read_file(file_name=doc_list[i])

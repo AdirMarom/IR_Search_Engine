@@ -94,18 +94,8 @@ class Parse:
             return True
         return False
 
-
-
-
-        def fix_number(sentence):
-            """
-                    This function change the representation of Number,10,000->10K ,10,123->10.123K
-                                                                        1,123,000->1.123M
-                                                                        1,123,000,000->1.123B
-                    :param number:  num from tweet.
-                    :return:string in Format  Number% .
-                    """
-            sentence = sentence.split(' ')
+    def fix_number(self,sentence):
+            sentence = re.split(', |_|-|!|/', sentence)
             for i in range(len(sentence)):
                 if (re.search(r"\d", sentence[i])):
                     if (i + 1 != len(sentence) and sentence[i + 1] != "Thousand" and sentence[i + 1] != "Million" and
@@ -125,29 +115,30 @@ class Parse:
                             elif (num > 1000000000):
                                 sentence[i] = num / 1000000000
                                 sentence[i] = "%.3f" % num + "B"
-                            if (sentence[i][-2] == '0'):
+                            if (len(sentence[i]) >=2 and sentence[i][-2] == '0'):
                                 sentence[i] = sentence[i][0:-2] + sentence[i][-1]
-                                if (sentence[i][-2] == '0'):
+                                if (len(sentence[i]) >=2 and sentence[i][-2] == '0'):
                                     sentence[i] = sentence[i][0:-2] + sentence[i][-1]
-                                    if (sentence[i][-2] == '0'):
+                                    if (len(sentence[i]) >=2 and sentence[i][-2] == '0'):
                                         sentence[i] = sentence[i][0:-2] + sentence[i][-1]
-                                        if (sentence[i][-2] == '.'):
+                                        if (len(sentence[i]) >=2 and sentence[i][-2] == '.'):
                                             sentence[i] = sentence[i][0:-2] + sentence[i][-1]
 
                     if (i + 1 == len(sentence)):
                         break
                     else:
-                        if (sentence[i + 1] == "Thousand"):
+                        if (sentence[i + 1] == "Thousand" or sentence[i + 1] == "thousand"):
                             sentence[i] += "K"
                             sentence[i + 1] = ""
-                        elif (sentence[i + 1] == "Million"):
+                        elif (sentence[i + 1] == "Million" or sentence[i + 1] == "million"):
                             sentence[i] += "M"
                             sentence[i + 1] = ""
-                        elif (sentence[i + 1] == "Billion"):
+                        elif (sentence[i + 1] == "Billion" or sentence[i + 1] == "billion"):
                             sentence[i] += "B"
                             sentence[i + 1] = ""
 
             sentence = ' '.join(map(str, sentence))
+            return sentence
 
     def Hashtags_parse(self,text):
         """
@@ -193,56 +184,5 @@ class Parse:
         strToParse = str.replace(strToParse, ' percent', '%')
         return strToParse
 
-    def fix_number(self,sentence):
-        """
-                This function change the representation of Number,10,000->10K ,10,123->10.123K
-                                                                    1,123,000->1.123M
-                                                                    1,123,000,000->1.123B
-                :param number:  num from tweet.
-                :return:string in Format  Number% .
-                """
-        sentence = sentence.split(' ')
-        for i in range(len(sentence)):
-            if (re.search(r"\d", sentence[i])):
-                if (i + 1 != len(sentence) and sentence[i + 1] != "Thousand" and sentence[i + 1] != "Million" and
-                        sentence[i + 1] != "Billion"):
-                    num = sentence[i]
-                    num = num.replace(',', '')
-                    first_num = float(num)
-                    if (num.isdigit()):
-                        num = float(num)
-                        if (1000 <= num < 1000000):
-                            num = num / 1000
-                            sentence[i] = "%.3f" % num + "K"
-
-                        elif (1000000 <= num < 1000000000):
-                            num = num / 1000000
-                            sentence[i] = "%.3f" % num + "M"
-                        elif (num > 1000000000):
-                            sentence[i] = num / 1000000000
-                            sentence[i] = "%.3f" % num + "B"
-                        if (sentence[i][-2] == '0'):
-                            sentence[i] = sentence[i][0:-2] + sentence[i][-1]
-                            if (sentence[i][-2] == '0'):
-                                sentence[i] = sentence[i][0:-2] + sentence[i][-1]
-                                if (sentence[i][-2] == '0'):
-                                    sentence[i] = sentence[i][0:-2] + sentence[i][-1]
-                                    if (sentence[i][-2] == '.'):
-                                        sentence[i] = sentence[i][0:-2] + sentence[i][-1]
-
-                if (i + 1 == len(sentence)):
-                    break
-                else:
-                    if (sentence[i + 1] == "Thousand"):
-                        sentence[i] += "K"
-                        sentence[i + 1] = ""
-                    elif (sentence[i + 1] == "Million"):
-                        sentence[i] += "M"
-                        sentence[i + 1] = ""
-                    elif (sentence[i + 1] == "Billion"):
-                        sentence[i] += "B"
-                        sentence[i + 1] = ""
-
-        return ' '.join(map(str, sentence))
 
 
