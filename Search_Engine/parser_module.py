@@ -3,11 +3,13 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from document import Document
 import re
+import spacy
 
 class Parse:
 
     def __init__(self):
         self.stop_words = stopwords.words('english')
+        self.dict={}
 
     def parse_sentence(self, text):
         """
@@ -15,9 +17,167 @@ class Parse:
         :param text:
         :return:
         """
+
         text_tokens = word_tokenize(text)
         text_tokens_without_stopwords = [w.lower() for w in text_tokens if w not in self.stop_words]
+        text_tokens_without_stopwords_ = [self.extand_contractions(w.lower()) for w in text_tokens if w not in self.stop_words]
+        for text in text_tokens_without_stopwords: text= self.extand_contractions(text)
         return text_tokens_without_stopwords
+
+    def extand_contractions(self,word):
+        '''
+         function extand contraction and Common Acronyms in Twitter
+        :param word:
+        :return:
+        '''
+        contractions = {
+            "ain't": "am not / are not",
+            "aren't": "are not / am not",
+            "can't": "cannot",
+            "can't've": "cannot have",
+            "'cause": "because",
+            "could've": "could have",
+            "couldn't": "could not",
+            "couldn't've": "could not have",
+            "didn't": "did not",
+            "doesn't": "does not",
+            "don't": "do not",
+            "hadn't": "had not",
+            "hadn't've": "had not have",
+            "hasn't": "has not",
+            "haven't": "have not",
+            "he'd": "he had / he would",
+            "he'd've": "he would have",
+            "he'll": "he shall / he will",
+            "he'll've": "he shall have / he will have",
+            "he's": "he has / he is",
+            "how'd": "how did",
+            "how'd'y": "how do you",
+            "how'll": "how will",
+            "how's": "how has / how is",
+            "i'd": "I had / I would",
+            "i'd've": "I would have",
+            "i'll": "I shall / I will",
+            "i'll've": "I shall have / I will have",
+            "i'm": "I am",
+            "i've": "I have",
+            "isn't": "is not",
+            "it'd": "it had / it would",
+            "it'd've": "it would have",
+            "it'll": "it shall / it will",
+            "it'll've": "it shall have / it will have",
+            "it's": "it has / it is",
+            "let's": "let us",
+            "ma'am": "madam",
+            "mayn't": "may not",
+            "might've": "might have",
+            "mightn't": "might not",
+            "mightn't've": "might not have",
+            "must've": "must have",
+            "mustn't": "must not",
+            "mustn't've": "must not have",
+            "needn't": "need not",
+            "needn't've": "need not have",
+            "o'clock": "of the clock",
+            "oughtn't": "ought not",
+            "oughtn't've": "ought not have",
+            "shan't": "shall not",
+            "sha'n't": "shall not",
+            "shan't've": "shall not have",
+            "she'd": "she had / she would",
+            "she'd've": "she would have",
+            "she'll": "she shall / she will",
+            "she'll've": "she shall have / she will have",
+            "she's": "she has / she is",
+            "should've": "should have",
+            "shouldn't": "should not",
+            "shouldn't've": "should not have",
+            "so've": "so have",
+            "so's": "so as / so is",
+            "that'd": "that would / that had",
+            "that'd've": "that would have",
+            "that's": "that has / that is",
+            "there'd": "there had / there would",
+            "there'd've": "there would have",
+            "there's": "there has / there is",
+            "they'd": "they had / they would",
+            "they'd've": "they would have",
+            "they'll": "they shall / they will",
+            "they'll've": "they shall have / they will have",
+            "they're": "they are",
+            "they've": "they have",
+            "to've": "to have",
+            "wasn't": "was not",
+            "we'd": "we had / we would",
+            "we'd've": "we would have",
+            "we'll": "we will",
+            "we'll've": "we will have",
+            "we're": "we are",
+            "we've": "we have",
+            "weren't": "were not",
+            "what'll": "what shall / what will",
+            "what'll've": "what shall have / what will have",
+            "what're": "what are",
+            "what's": "what has / what is",
+            "what've": "what have",
+            "when's": "when has / when is",
+            "when've": "when have",
+            "where'd": "where did",
+            "where's": "where has / where is",
+            "where've": "where have",
+            "who'll": "who shall / who will",
+            "who'll've": "who shall have / who will have",
+            "who's": "who has / who is",
+            "who've": "who have",
+            "why's": "why has / why is",
+            "why've": "why have",
+            "will've": "will have",
+            "won't": "will not",
+            "won't've": "will not have",
+            "would've": "would have",
+            "wouldn't": "would not",
+            "wouldn't've": "would not have",
+            "y'all": "you all",
+            "y'all'd": "you all would",
+            "y'all'd've": "you all would have",
+            "y'all're": "you all are",
+            "y'all've": "you all have",
+            "you'd": "you had / you would",
+            "you'd've": "you would have",
+            "you'll": "you shall / you will",
+            "you'll've": "you shall have / you will have",
+            "you're": "you are",
+            "you've": "you have",
+            "AFK": "Away From Keyboard",
+            "BBIAB": "Be Back In A Bit",
+            "BBL": "Be Back Later",
+            "BBS ":"Be Back Soon",
+            "BEG" : "Big Evil Grin",
+            "BRB" : "Be Right Back",
+            "BTW": "By The Way",
+            "EG":"Evil Grin",
+            "FISH" : "First In, Still Here",
+            "IDK" : "I Don't Know",
+            "IMO" : "In My Opinion",
+            "IRL" :"In Real Life",
+            "KISS":"Keep It Simple,Stupid",
+            "LMK" :"Let Me Know",
+            "LOL" :"Laughing Out Loud",
+            "NYOB":" None of Your Business",
+            "OFC ":"Of Course",
+            "OMG ":"Oh My God",
+            "PANS":"Pretty Awesome New Stuff",
+            "PHAT":"Pretty, Hot, And Tempting",
+            "POS ":"Parents Over Shoulder",
+            "ROFL": "Rolling On the Floor Laughing",
+            "SMH ":"Shaking My Head",
+            "TTYL":"Talk To You Later",
+            "YOLO": "You Only Live Once",
+            "WTH ":"What The Heck",
+        }
+        if(word in contractions):
+            return contractions[word.lower()]
+        return word
 
     def parse_doc(self, doc_as_list):
         """
@@ -41,7 +201,19 @@ class Parse:
         tokenized_text = self.parse_sentence(full_text)
         doc_length = len(tokenized_text)  # after text operations.
 
+
+
         for term in tokenized_text:
+            self.upper_lower_case(term)
+
+        for term in tokenized_text:
+            term1=term.lower()
+            if(term1 in self.dict.keys()):
+                term=term.lower()
+                if(self.dict[term][1]==0):
+                    term=term.lower()
+                else:
+                    term=term.upper()
             if term not in term_dict.keys():
                 term_dict[term] = 1
             else:
@@ -57,6 +229,23 @@ class Parse:
         full_text=self.fix_number(full_text)
         return full_text
 
+    def upper_lower_case(self,word):
+        if (word[0].isalpha()==False):
+            return
+        word_status=(0,0)
+        if(word[0].isupper()):
+            word_status=(word,1)
+        else:
+            word_status=(word,0)
+        word=word.lower()
+
+        if(word not in self.dict.keys()):
+                self.dict[word]=word_status
+        else:
+            if (word_status[1]==1 and self.dict[word][1]==0):
+                self.dict[word][1]=0
+            elif(word_status[1]==0 and self.dict[word][1]==1):
+                self.dict[word] = 0
 
     def parse_url(self,url_string):
         """
@@ -65,6 +254,8 @@ class Parse:
         :param tag: Hashtag word from tweet.
         :return: list include spread world from the url .
         """
+        if(url_string is None or url_string is ''):
+            return
         lst = []
         o = urlparse(url_string)
         scheme = o.scheme
@@ -95,15 +286,25 @@ class Parse:
         return False
 
     def fix_number(self,sentence):
-            sentence = re.split(', |_|-|!|/', sentence)
+            sentence=word_tokenize(sentence)
+            #sentence = re.split(', |_|-|!|/| ', sentence)
+            a=2
             for i in range(len(sentence)):
                 if (re.search(r"\d", sentence[i])):
                     if (i + 1 != len(sentence) and sentence[i + 1] != "Thousand" and sentence[i + 1] != "Million" and
                             sentence[i + 1] != "Billion"):
                         num = sentence[i]
                         num = num.replace(',', '')
-                        first_num = float(num)
-                        if (num.isdigit()):
+                        if(num.isnumeric()==False):
+                            continue
+                        flag=False
+                        for digit in range(len(num)):
+                            if(num[digit].isdigit()==False):
+                                flag=True;
+                        if(flag):
+                            continue
+
+                        if (num.isnumeric()):
                             num = float(num)
                             if (1000 <= num < 1000000):
                                 num = num / 1000
@@ -138,6 +339,12 @@ class Parse:
                             sentence[i + 1] = ""
 
             sentence = ' '.join(map(str, sentence))
+            sentence.replace("Thousand","1K")
+            sentence.replace("thousand", "1K")
+            sentence.replace("Million", "1M")
+            sentence.replace("million", "1M")
+            sentence.replace("Billion", "1B")
+            sentence.replace("billion", "1B")
             return sentence
 
     def Hashtags_parse(self,text):
@@ -146,28 +353,27 @@ class Parse:
         :param tag: Hashtag word from tweet.
         :return: list include spread world and #tag .
         """
+        text=text.replace("/n",'')
         lst=str.split(text," ")
+        if(lst.__contains__('')):
+            lst.remove('')
         count=0
+        parseList=''
         for term in lst:
             count+=1
             tag=term
-            if(tag[0]!='#'):
+            if(len(tag)<=0 or tag[0]!='#'):
                 continue
-            strToParse=tag[1:]
-            flag=strToParse.find('_')
-            if flag>-1:
-                parseList = re.sub(r"([^a-zA-Z])", r" \1", strToParse)
-                parseList=str.replace(parseList,'_','')
-
-            else:
-                parseList = re.sub(r"([A-Z])", r" \1", strToParse)
+            parseList=tag[1:]
+            parseList = str.replace(parseList, '_', '')
+            parseList = re.sub(r"([A-Z])", r" \1", parseList)
             parseList = parseList.lower()
             secparseList= parseList.replace(' ','')
             split_tag= str.split(parseList, " ") + ['#' + secparseList]
             if(count==len(lst)):
                 lst=lst[:len(lst)-1]+split_tag
             else:
-                lst= lst[:count]+split_tag+lst[count]
+                lst= lst[:count]+split_tag+lst[count:]
         lst= ' '.join(map(str,lst))
         return lst
 
@@ -183,6 +389,4 @@ class Parse:
         strToParse = str.replace(strToParse, ' PERCENT', '%')
         strToParse = str.replace(strToParse, ' percent', '%')
         return strToParse
-
-
 

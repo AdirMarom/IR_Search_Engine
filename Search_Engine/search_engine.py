@@ -38,6 +38,8 @@ def run_engine():
     for idx, document in enumerate(doc_list2):
 
         print(number_of_documents)
+        if (number_of_documents==1):
+            a=4
         # parse the document
         parsed_document = p.parse_doc(document)
         number_of_documents += 1
