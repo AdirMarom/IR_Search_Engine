@@ -7,4 +7,7 @@ if __name__ == '__main__':
     par=Parse()
     a = par.Hashtags_parse("word world pip 5 percent sos #stay_At_Home")
     c=2
+    b="abc_".isalpha()
+    b = "abc1".isalpha()
+    b = "!abc1".isalpha()
     search_engine.main()

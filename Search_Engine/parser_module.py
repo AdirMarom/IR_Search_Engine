@@ -1,4 +1,6 @@
 from urllib.parse import urlparse
+
+from nltk import pos_tag, RegexpParser
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from document import Document
@@ -9,7 +11,10 @@ class Parse:
 
     def __init__(self):
         self.stop_words = stopwords.words('english')
-        self.dict={}
+        self.global_dict={}
+        self.garbage=[]
+
+
 
     def parse_sentence(self, text):
         """
@@ -19,7 +24,7 @@ class Parse:
         """
 
         text_tokens = word_tokenize(text)
-        text_tokens_without_stopwords = [w.lower() for w in text_tokens if w not in self.stop_words]
+        text_tokens_without_stopwords = [w for w in text_tokens if w not in self.stop_words]
         text_tokens_without_stopwords_ = [self.extand_contractions(w.lower()) for w in text_tokens if w not in self.stop_words]
         for text in text_tokens_without_stopwords: text= self.extand_contractions(text)
         return text_tokens_without_stopwords
@@ -202,18 +207,18 @@ class Parse:
         doc_length = len(tokenized_text)  # after text operations.
 
 
-
         for term in tokenized_text:
             self.upper_lower_case(term)
 
         for term in tokenized_text:
-            term1=term.lower()
-            if(term1 in self.dict.keys()):
-                term=term.lower()
-                if(self.dict[term][1]==0):
-                    term=term.lower()
-                else:
-                    term=term.upper()
+            self.update_global_dict(term)
+       #     term1=term.lower()
+       #     if(term1 in self.global_dict.keys()):
+       #         term=term.lower()
+       #         if(self.global_dict[term][1]==0):
+       #             term=term.lower()
+       #         else:
+       #             term=term.upper()
             if term not in term_dict.keys():
                 term_dict[term] = 1
             else:
@@ -222,6 +227,26 @@ class Parse:
         document = Document(tweet_id, tweet_date, full_text, url, retweet_text, retweet_url, quote_text,
                             quote_url, term_dict, doc_length)
         return document
+
+    def update_global_dict(self,term):
+        if(term.isalpha()):
+            if term in self.global_dict.keys():
+                if str.isupper(term[0]):
+                    if term.lower() in self.global_dict.keys():
+                        print(term.lower() +':'+str(self.global_dict[term.lower()]))
+                        print(term + ':' + str(self.global_dict[term]))
+                        self.global_dict[term.lower()]+= self.global_dict[term]+1
+                        print(term.lower() + ':' +str(self.global_dict[term.lower()]))
+                        del self.global_dict[term]
+                    else:
+                        self.global_dict[term]+=1
+                else:
+                    self.global_dict[term]=self.global_dict[term]+1
+            else:
+                self.global_dict[term]=1
+        else:
+            self.garbage.append(term)
+
 
     def advance_parse(self,full_text):
         full_text=self.Hashtags_parse(full_text)
@@ -239,13 +264,13 @@ class Parse:
             word_status=(word,0)
         word=word.lower()
 
-        if(word not in self.dict.keys()):
-                self.dict[word]=word_status
-        else:
-            if (word_status[1]==1 and self.dict[word][1]==0):
-                self.dict[word][1]=0
-            elif(word_status[1]==0 and self.dict[word][1]==1):
-                self.dict[word] = 0
+    #   if(word not in self.global_dict.keys()):
+    #           self.global_dict[word]=word_status
+    #   else:
+    #       if (word_status[1]==1 and self.dict[word][1]==0):
+    #           self.dict[word][1]=0
+    #       elif(word_status[1]==0 and self.dict[word][1]==1):
+    #           self.dict[word] = 0
 
     def parse_url(self,url_string):
         """
