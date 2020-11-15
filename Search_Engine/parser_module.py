@@ -12,6 +12,7 @@ class Parse:
     def __init__(self):
         self.stop_words = stopwords.words('english')
         self.global_dict={}
+
         self.garbage=[]
 
 
@@ -180,9 +181,25 @@ class Parse:
             "YOLO": "You Only Live Once",
             "WTH ":"What The Heck",
         }
-        if(word in contractions):
-            return contractions[word.lower()]
+        if(word in contractions.keys()):
+            return contractions[word]
         return word
+
+    def find_entities(self,text):
+        nlp = spacy.load("en_core_web_lg")
+        doc = nlp(text)
+        dict = {}
+        for ent in doc.ents:
+            string_name = str(ent)
+            if string_name in dict.keys():
+                dict[string_name] += 1
+            else:
+                dict[string_name] = 1
+        lst = []
+        for key in dict.keys():
+            if (dict[key] >= 2):
+                lst.append(key)
+        return lst
 
     def parse_doc(self, doc_as_list):
         """
@@ -212,13 +229,13 @@ class Parse:
 
         for term in tokenized_text:
             self.update_global_dict(term)
-       #     term1=term.lower()
-       #     if(term1 in self.global_dict.keys()):
-       #         term=term.lower()
-       #         if(self.global_dict[term][1]==0):
-       #             term=term.lower()
-       #         else:
-       #             term=term.upper()
+
+            if(self.save_as_tag(term)):
+                if term not in term_dict.keys():
+                    term_dict[term] = 1
+                else:
+                    term_dict[term] += 1
+
             if term not in term_dict.keys():
                 term_dict[term] = 1
             else:
@@ -233,10 +250,7 @@ class Parse:
             if term in self.global_dict.keys():
                 if str.isupper(term[0]):
                     if term.lower() in self.global_dict.keys():
-                        print(term.lower() +':'+str(self.global_dict[term.lower()]))
-                        print(term + ':' + str(self.global_dict[term]))
                         self.global_dict[term.lower()]+= self.global_dict[term]+1
-                        print(term.lower() + ':' +str(self.global_dict[term.lower()]))
                         del self.global_dict[term]
                     else:
                         self.global_dict[term]+=1
@@ -252,6 +266,7 @@ class Parse:
         full_text=self.Hashtags_parse(full_text)
         full_text = self.percent_parse(full_text)
         full_text=self.fix_number(full_text)
+
         return full_text
 
     def upper_lower_case(self,word):
@@ -305,8 +320,15 @@ class Parse:
 
         return ' '.join(map(str, lst))
 
-    def is_tag(self,word):
+    def save_as_tag(self, word):
         if (word.startswith('@') and len(word) > 1):
+            if word not in self.global_dict.keys():
+                self.global_dict[word]=1
+                self
+            else:
+                self.global_dict[word] += 1
+
+
             return True
         return False
 
@@ -314,6 +336,7 @@ class Parse:
             sentence=word_tokenize(sentence)
             #sentence = re.split(', |_|-|!|/| ', sentence)
             a=2
+            lst_piece_num=[]
             for i in range(len(sentence)):
                 if (re.search(r"\d", sentence[i])):
                     if (i + 1 != len(sentence) and sentence[i + 1] != "Thousand" and sentence[i + 1] != "Million" and
@@ -350,6 +373,8 @@ class Parse:
                                         if (len(sentence[i]) >=2 and sentence[i][-2] == '.'):
                                             sentence[i] = sentence[i][0:-2] + sentence[i][-1]
 
+
+
                     if (i + 1 == len(sentence)):
                         break
                     else:
@@ -362,14 +387,9 @@ class Parse:
                         elif (sentence[i + 1] == "Billion" or sentence[i + 1] == "billion"):
                             sentence[i] += "B"
                             sentence[i + 1] = ""
-
+                    lst_piece_num.append(sentence[i])
             sentence = ' '.join(map(str, sentence))
-            sentence.replace("Thousand","1K")
-            sentence.replace("thousand", "1K")
-            sentence.replace("Million", "1M")
-            sentence.replace("million", "1M")
-            sentence.replace("Billion", "1B")
-            sentence.replace("billion", "1B")
+
             return sentence
 
     def Hashtags_parse(self,text):
