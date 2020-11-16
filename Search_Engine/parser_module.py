@@ -5,6 +5,8 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from document import Document
 import re
+from nltk.stem import PorterStemmer
+from nltk.stem import LancasterStemmer
 ##import spacy
 
 class Parse:
@@ -588,3 +590,8 @@ class Parse:
                 self.update_global_dict(currency_dict[cur])
         for word in curr_lst:
             self.update_global_dict(word)
+
+    def stemmer(self,sentence):
+        '''
+
+        '''
