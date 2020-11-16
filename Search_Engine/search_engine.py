@@ -29,6 +29,7 @@ def run_engine():
             if (Path(inner_entry).suffix == '.parquet'):
                 doc_list.append(inner_entry);
 
+
     for i in range (len(doc_list)):
         tmp_list=r.read_file(file_name=doc_list[i])
         doc_list2+=tmp_list

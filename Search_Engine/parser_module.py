@@ -1,5 +1,6 @@
 from urllib.parse import urlparse
 
+import spacy
 from nltk import pos_tag, RegexpParser
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
@@ -7,16 +8,16 @@ from document import Document
 import re
 from nltk.stem import PorterStemmer
 from nltk.stem import LancasterStemmer
+
+
 ##import spacy
 
 class Parse:
 
     def __init__(self):
-        self.stop_words = stopwords.words('english')
-        self.global_dict={}
-        self.garbage=[]
-
-
+        self.stop_words = stopwords.words('english')+['?','!',',','',]
+        self.global_dict = {}
+        self.garbage = []
 
     def parse_sentence(self, text):
         """
@@ -27,11 +28,12 @@ class Parse:
 
         text_tokens = word_tokenize(text)
         text_tokens_without_stopwords = [w for w in text_tokens if w not in self.stop_words]
-        text_tokens_without_stopwords_ = [self.extand_contractions(w.lower()) for w in text_tokens if w not in self.stop_words]
-        for text in text_tokens_without_stopwords: text= self.extand_contractions(text)
+        text_tokens_without_stopwords_ = [self.extand_contractions(w.lower()) for w in text_tokens if
+                                          w not in self.stop_words]
+        for text in text_tokens_without_stopwords: text = self.extand_contractions(text)
         return text_tokens_without_stopwords
 
-    def extand_contractions(self,word):
+    def extand_contractions(self, word):
         '''
          function extand contraction and Common Acronyms in Twitter
         :param word:
@@ -158,49 +160,49 @@ class Parse:
             "AFK": "Away From Keyboard",
             "BBIAB": "Be Back In A Bit",
             "BBL": "Be Back Later",
-            "BBS ":"Be Back Soon",
-            "BEG" : "Big Evil Grin",
-            "BRB" : "Be Right Back",
+            "BBS ": "Be Back Soon",
+            "BEG": "Big Evil Grin",
+            "BRB": "Be Right Back",
             "BTW": "By The Way",
-            "EG":"Evil Grin",
-            "FISH" : "First In, Still Here",
-            "IDK" : "I Don't Know",
-            "IMO" : "In My Opinion",
-            "IRL" :"In Real Life",
-            "KISS":"Keep It Simple,Stupid",
-            "LMK" :"Let Me Know",
-            "LOL" :"Laughing Out Loud",
-            "NYOB":" None of Your Business",
-            "OFC ":"Of Course",
-            "OMG ":"Oh My God",
-            "PANS":"Pretty Awesome New Stuff",
-            "PHAT":"Pretty, Hot, And Tempting",
-            "POS ":"Parents Over Shoulder",
+            "EG": "Evil Grin",
+            "FISH": "First In, Still Here",
+            "IDK": "I Don't Know",
+            "IMO": "In My Opinion",
+            "IRL": "In Real Life",
+            "KISS": "Keep It Simple,Stupid",
+            "LMK": "Let Me Know",
+            "LOL": "Laughing Out Loud",
+            "NYOB": " None of Your Business",
+            "OFC ": "Of Course",
+            "OMG ": "Oh My God",
+            "PANS": "Pretty Awesome New Stuff",
+            "PHAT": "Pretty, Hot, And Tempting",
+            "POS ": "Parents Over Shoulder",
             "ROFL": "Rolling On the Floor Laughing",
-            "SMH ":"Shaking My Head",
-            "TTYL":"Talk To You Later",
+            "SMH ": "Shaking My Head",
+            "TTYL": "Talk To You Later",
             "YOLO": "You Only Live Once",
-            "WTH ":"What The Heck",
+            "WTH ": "What The Heck",
         }
-        if(word in contractions.keys()):
+        if (word in contractions.keys()):
             return contractions[word]
         return word
 
-    def find_entities(self,text):
-        nlp = spacy.load("en_core_web_lg")
+    def find_entities(self, text):
+        '''
+        this function find entities and add them to the dictionary
+        :param text: the twit text
+        :param term_dict: the words dictionary of document
+        :return:
+        '''
+        nlp = spacy.load("en_core_web_sm")
         doc = nlp(text)
         dict = {}
+        flag = False
         for ent in doc.ents:
-            string_name = str(ent)
-            if string_name in dict.keys():
-                dict[string_name] += 1
-            else:
-                dict[string_name] = 1
-        lst = []
-        for key in dict.keys():
-            if (dict[key] >= 2):
-                lst.append(key)
-        return lst
+            entity = str(ent)
+            ##change if entity show 2 or more
+            self.update_global_dict(entity)
 
     def parse_doc(self, doc_as_list):
         """
@@ -220,76 +222,70 @@ class Parse:
         retweet_url = self.parse_url(retweet_url)
         url = self.parse_url(url)
         quote_url = self.parse_url(quote_url)
-        full_text=self.advance_parse(full_text)
         tokenized_text = self.parse_sentence(full_text)
         doc_length = len(tokenized_text)  # after text operations.
-
-
+        g = []
+        # save #tag
+        term_dict = self.Hashtags_parse(full_text, term_dict)
+        # save word begin in @
+        term_dict = self.save_as_tag(full_text, term_dict)
+        # save numbers end with M K B
+        term_dict = self.fix_number(full_text, term_dict)
+        # save num%
+        term_dict = self.percent_parse(full_text, term_dict)
+        # save entity
+        self.find_entities(full_text)
         for term in tokenized_text:
             self.upper_lower_case(term)
 
         for term in tokenized_text:
-           ## self.update_global_dict(term)
 
-            #save word begin in @
-            term_dict=self.save_as_tag(term,term_dict)
-            #save numbers end with M K B
-            term_dict=self.fix_number(term,term_dict)
-            #save #tag
-            term_dict = self.Hashtags_parse(term, term_dict)
-            #save num%
-            term_dict= self.percent_parse(term, term_dict)
+            # lower upper case for global
+            self.update_global_dict(term)
 
-            if term not in term_dict.keys():
-                term_dict[term] = 1
+            if (str.isalpha(term)):
+                term_dict = self.update_doc_dict(term_dict, term)
             else:
-                term_dict[term] += 1
-
+                g.append(term)
+        a = 5
         document = Document(tweet_id, tweet_date, full_text, url, retweet_text, retweet_url, quote_text,
                             quote_url, term_dict, doc_length)
         return document
 
-    def update_global_dict(self,term):
-        if(term.isalpha()):
+    def update_global_dict(self, term):
+        if (term.isalpha()):
             if term in self.global_dict.keys():
                 if str.isupper(term[0]):
                     if term.lower() in self.global_dict.keys():
-                        self.global_dict[term.lower()]+= self.global_dict[term]+1
+                        self.global_dict[term.lower()] += self.global_dict[term] + 1
                         del self.global_dict[term]
                     else:
-                        self.global_dict[term]+=1
+                        self.global_dict[term] += 1
                 else:
-                    self.global_dict[term]=self.global_dict[term]+1
+                    self.global_dict[term] = self.global_dict[term] + 1
             else:
-                self.global_dict[term]=1
+                self.global_dict[term] = 1
         else:
             self.garbage.append(term)
 
-    def advance_parse(self,full_text):
-        full_text=self.Hashtags_parse(full_text)
-        full_text = self.percent_parse(full_text)
-        full_text=self.fix_number(full_text)
-
-        return full_text
-
-    def upper_lower_case(self,word):
-        if (word[0].isalpha()==False):
+    def upper_lower_case(self, word):
+        if (word[0].isalpha() == False):
             return
-        word_status=(0,0)
-        if(word[0].isupper()):
-            word_status=(word,1)
+        word_status = (0, 0)
+        if (word[0].isupper()):
+            word_status = (word, 1)
         else:
-            word_status=(word,0)
-        word=word.lower()
+            word_status = (word, 0)
+        word = word.lower()
 
-    def parse_url(self,url_string):
+    def parse_url(self, url_string):
         """
         This function takes a  url_string from document and break it into to list of word :
         https://www.instagram.com/p/CD7fAPWs3WM/?igshid=o9kf0ugp1l8x ->[https, www, instagram.com, p, CD7fAPWs3WM, igshid, o9kf0ugp1l8x ]
         :param tag: Hashtag word from tweet.
         :return: list include spread world from the url .
         """
-        if(url_string is None or url_string is ''):
+        if (url_string is None or url_string is ''):
             return
         lst = []
         o = urlparse(url_string)
@@ -315,127 +311,127 @@ class Parse:
 
         return ' '.join(map(str, lst))
 
-    def save_as_tag(self, word,term_dict):
-        if (word.startswith('@') and len(word) > 1):
-            self.update_global_dict(word)
-            return self.update_doc_dict(term_dict,word)
+    def save_as_tag(self, full_text, term_dict):
+        splitter = full_text.split()
+        for word in splitter:
+            if (word.startswith('@') and len(word) > 1):
+                self.update_global_dict(word)
+                self.update_doc_dict(term_dict, word)
         return term_dict
 
-    def fix_number(self,sentence,term_dict):
-            sentence=word_tokenize(sentence)
-            #sentence = re.split(', |_|-|!|/| ', sentence)
-            a=2
-            lst_piece_num=[]
-            for i in range(len(sentence)):
-                if (re.search(r"\d", sentence[i])):
-                    if (i + 1 != len(sentence) and sentence[i + 1] != "Thousand" and sentence[i + 1] != "Million" and
-                            sentence[i + 1] != "Billion"):
-                        num = sentence[i]
-                        num = num.replace(',', '')
-                        if(num.isnumeric()==False):
-                            continue
-                        flag=False
-                        for digit in range(len(num)):
-                            if(num[digit].isdigit()==False):
-                                flag=True;
-                        if(flag):
-                            continue
+    def fix_number(self, sentence, term_dict):
+        sentence = word_tokenize(sentence)
+        # sentence = re.split(', |_|-|!|/| ', sentence)
+        a = 2
+        lst_piece_num = []
+        for i in range(len(sentence)):
+            if (re.search(r"\d", sentence[i])):
+                if (i + 1 != len(sentence) and sentence[i + 1] != "Thousand" and sentence[i + 1] != "Million" and
+                        sentence[i + 1] != "Billion"):
+                    num = sentence[i]
+                    num = num.replace(',', '')
+                    if (num.isnumeric() == False):
+                        continue
+                    flag = False
+                    for digit in range(len(num)):
+                        if (num[digit].isdigit() == False):
+                            flag = True;
+                    if (flag):
+                        continue
 
-                        if (num.isnumeric()):
-                            num = float(num)
-                            if (1000 <= num < 1000000):
-                                num = num / 1000
-                                sentence[i] = "%.3f" % num + "K"
+                    if (num.isnumeric()):
+                        num = float(num)
+                        if (1000 <= num < 1000000):
+                            num = num / 1000
+                            sentence[i] = "%.3f" % num + "K"
 
-                            elif (1000000 <= num < 1000000000):
-                                num = num / 1000000
-                                sentence[i] = "%.3f" % num + "M"
-                            elif (num > 1000000000):
-                                sentence[i] = num / 1000000000
-                                sentence[i] = "%.3f" % num + "B"
-                            if (len(sentence[i]) >=2 and sentence[i][-2] == '0'):
+                        elif (1000000 <= num < 1000000000):
+                            num = num / 1000000
+                            sentence[i] = "%.3f" % num + "M"
+                        elif (num > 1000000000):
+                            sentence[i] = num / 1000000000
+                            sentence[i] = "%.3f" % num + "B"
+                        if (len(sentence[i]) >= 2 and sentence[i][-2] == '0'):
+                            sentence[i] = sentence[i][0:-2] + sentence[i][-1]
+                            if (len(sentence[i]) >= 2 and sentence[i][-2] == '0'):
                                 sentence[i] = sentence[i][0:-2] + sentence[i][-1]
-                                if (len(sentence[i]) >=2 and sentence[i][-2] == '0'):
+                                if (len(sentence[i]) >= 2 and sentence[i][-2] == '0'):
                                     sentence[i] = sentence[i][0:-2] + sentence[i][-1]
-                                    if (len(sentence[i]) >=2 and sentence[i][-2] == '0'):
+                                    if (len(sentence[i]) >= 2 and sentence[i][-2] == '.'):
                                         sentence[i] = sentence[i][0:-2] + sentence[i][-1]
-                                        if (len(sentence[i]) >=2 and sentence[i][-2] == '.'):
-                                            sentence[i] = sentence[i][0:-2] + sentence[i][-1]
 
+                if (i + 1 == len(sentence)):
+                    break
+                else:
+                    if (sentence[i + 1] == "Thousand" or sentence[i + 1] == "thousand"):
+                        sentence[i] += "K"
+                        sentence[i + 1] = ""
+                    elif (sentence[i + 1] == "Million" or sentence[i + 1] == "million"):
+                        sentence[i] += "M"
+                        sentence[i + 1] = ""
+                    elif (sentence[i + 1] == "Billion" or sentence[i + 1] == "billion"):
+                        sentence[i] += "B"
+                        sentence[i + 1] = ""
+                lst_piece_num.append(sentence[i])
+                term_dict = self.update_doc_dict(term_dict, sentence[i])
+        for word in lst_piece_num:
+            self.update_global_dict(word)
+        ##sentence = ' '.join(map(str, sentence[i]))
 
+        return term_dict
 
-                    if (i + 1 == len(sentence)):
-                        break
-                    else:
-                        if (sentence[i + 1] == "Thousand" or sentence[i + 1] == "thousand"):
-                            sentence[i] += "K"
-                            sentence[i + 1] = ""
-                        elif (sentence[i + 1] == "Million" or sentence[i + 1] == "million"):
-                            sentence[i] += "M"
-                            sentence[i + 1] = ""
-                        elif (sentence[i + 1] == "Billion" or sentence[i + 1] == "billion"):
-                            sentence[i] += "B"
-                            sentence[i + 1] = ""
-                    lst_piece_num.append(sentence[i])
-                    term_dict=self.update_doc_dict(term_dict, sentence[i])
-            for word in lst_piece_num:
-                self.update_global_dict(word)
-            ##sentence = ' '.join(map(str, sentence[i]))
-
-            return term_dict
-
-    def update_doc_dict(self,term_dict,word):
-        if word not in term_dict.keys():
+    def update_doc_dict(self, term_dict, word):
+        if word not in term_dict.keys() and word not in self.stop_words:
             term_dict[word] = 1
         else:
             term_dict[word] += 1
         return term_dict
 
     def update_global_dict(self, word):
-        if word not in self.global_dict.keys():
+        if word not in self.global_dict.keys() and word not in self.stop_words:
             self.global_dict[word] = 1
         else:
             self.global_dict[word] += 1
 
-    def Hashtags_parse(self,text,term_dict):
+    def Hashtags_parse(self, text, term_dict):
         """
         This function takes a  Hashtag world from document and break it into to list of word
         :param tag: Hashtag word from tweet.
         :return: list include spread world and #tag .
         """
-        text=text.replace("/n",'')
-        lst=str.split(text," ")
-        if(lst.__contains__('')):
+        text = text.replace("/n", '')
+        lst = str.split(text, " ")
+        if (lst.__contains__('')):
             lst.remove('')
-        count=0
-        parseList=''
+        count = 0
+        parseList = ''
         for term in lst:
-            count+=1
-            tag=term
-            flag=True
-            if(len(tag)<=0 or tag[0]!='#'):
+            count += 1
+            tag = term
+            flag = True
+            if (len(tag) <= 0 or tag[0] != '#'):
                 continue
-            parseList=tag[1:]
+            parseList = tag[1:]
             parseList = str.replace(parseList, '_', '')
             parseList = re.sub(r"([A-Z])", r" \1", parseList)
             parseList = parseList.lower()
-            secparseList= parseList.replace(' ','')
-            split_tag= str.split(parseList, " ") + ['#' + secparseList]
+            secparseList = parseList.replace(' ', '')
+            split_tag = str.split(parseList, " ") + ['#' + secparseList]
             for word in split_tag:
-                term_dict=self.update_doc_dict(term_dict,word)
-                if(flag):
-                    flag=False
+                term_dict = self.update_doc_dict(term_dict, word)
+                if (flag):
+                    flag = False
                     self.update_global_dict(word)
         return term_dict
 
-     ##       if(count==len(lst)):
-     ##           lst=lst[:len(lst)-1]+split_tag
-     ##       else:
-     ##           lst= lst[:count]+split_tag+lst[count:]
-     ##   lst= ' '.join(map(str,lst))
-       ## return lst
+    ##       if(count==len(lst)):
+    ##           lst=lst[:len(lst)-1]+split_tag
+    ##       else:
+    ##           lst= lst[:count]+split_tag+lst[count:]
+    ##   lst= ' '.join(map(str,lst))
+    ## return lst
 
-    def percent_parse(self,sentence,term_dict):
+    def percent_parse(self, sentence, term_dict):
         """
         This function change the representation of Number%,Number percent,Number percentage to Number%
         :param s:  word from tweet.
@@ -443,11 +439,11 @@ class Parse:
         """
 
         sentence_lst = word_tokenize(sentence)
-        percent_op=[' percentage',' PERCENTAGE',' PERCENT',' percent']
-        for i in range(0,len(sentence_lst)):
-            if(str.isnumeric(sentence_lst[i] and i+1<len(sentence_lst)) and sentence_lst[i+1] in percent_op):
-                term_dict=self.update_doc_dict(term_dict,sentence_lst[i]+'%')
-                self.update_global_dict(sentence_lst[i]+'%')
+        percent_op = [' percentage', ' PERCENTAGE', ' PERCENT', ' percent']
+        for i in range(0, len(sentence_lst)):
+            if (str.isnumeric(sentence_lst[i]) and i + 1 < len(sentence_lst) and sentence_lst[i + 1] in percent_op):
+                term_dict = self.update_doc_dict(term_dict, sentence_lst[i] + '%')
+                self.update_global_dict(sentence_lst[i] + '%')
         return term_dict
 
     def currency_parse(self, sentence, term_dict):
@@ -456,7 +452,7 @@ class Parse:
               :param sentence:  thw sentece we look up for currency show
               :return:same sentence with extends, $-->$,usd,us dollar .
               """
-        curr_lst=[]
+        curr_lst = []
         currency_dict = {
             'ALL': 'Albania Lek',
             'AFN': 'Afghanistan Afghani',
@@ -575,13 +571,13 @@ class Parse:
         sentence = word_tokenize(sentence)
         for i in range(len(sentence)):
             if (sentence[i] in currency_dict):
-                cur=sentence[i]
-                term_dict= self.update_doc_dict(term_dict,cur)
-                term_dict=self.update_doc_dict(term_dict,currency_dict[cur])
-                curr_lst.append(cur,currency_dict[cur])
+                cur = sentence[i]
+                term_dict = self.update_doc_dict(term_dict, cur)
+                term_dict = self.update_doc_dict(term_dict, currency_dict[cur])
+                curr_lst.append(cur, currency_dict[cur])
                 self.update_global_dict(cur)
                 self.update_global_dict(currency_dict[cur])
-            elif(sentence[i] in currency_dict.values()):
+            elif (sentence[i] in currency_dict.values()):
                 cur = sentence[i]
                 term_dict = self.update_doc_dict(term_dict, cur)
                 term_dict = self.update_doc_dict(term_dict, currency_dict[cur])
@@ -591,7 +587,7 @@ class Parse:
         for word in curr_lst:
             self.update_global_dict(word)
 
-    def stemmer(self,sentence):
+    def stemmer(self, sentence):
         porter = PorterStemmer()
         lancaster = LancasterStemmer()
 
