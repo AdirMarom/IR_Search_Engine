@@ -5,14 +5,13 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from document import Document
 import re
-import spacy
+##import spacy
 
 class Parse:
 
     def __init__(self):
         self.stop_words = stopwords.words('english')
         self.global_dict={}
-
         self.garbage=[]
 
 
@@ -228,13 +227,16 @@ class Parse:
             self.upper_lower_case(term)
 
         for term in tokenized_text:
-            self.update_global_dict(term)
+           ## self.update_global_dict(term)
 
-            if(self.save_as_tag(term)):
-                if term not in term_dict.keys():
-                    term_dict[term] = 1
-                else:
-                    term_dict[term] += 1
+            #save word begin in @
+            term_dict=self.save_as_tag(term,term_dict)
+            #save numbers
+            term_dict=self.fix_number(term,term_dict)
+            #save #tag
+            term_dict = self.Hashtags_parse(term, term_dict)
+            #save num%
+            term_dict= self.percent_parse(term, term_dict)
 
             if term not in term_dict.keys():
                 term_dict[term] = 1
@@ -261,7 +263,6 @@ class Parse:
         else:
             self.garbage.append(term)
 
-
     def advance_parse(self,full_text):
         full_text=self.Hashtags_parse(full_text)
         full_text = self.percent_parse(full_text)
@@ -278,14 +279,6 @@ class Parse:
         else:
             word_status=(word,0)
         word=word.lower()
-
-    #   if(word not in self.global_dict.keys()):
-    #           self.global_dict[word]=word_status
-    #   else:
-    #       if (word_status[1]==1 and self.dict[word][1]==0):
-    #           self.dict[word][1]=0
-    #       elif(word_status[1]==0 and self.dict[word][1]==1):
-    #           self.dict[word] = 0
 
     def parse_url(self,url_string):
         """
@@ -320,19 +313,13 @@ class Parse:
 
         return ' '.join(map(str, lst))
 
-    def save_as_tag(self, word):
+    def save_as_tag(self, word,term_dict):
         if (word.startswith('@') and len(word) > 1):
-            if word not in self.global_dict.keys():
-                self.global_dict[word]=1
-                self
-            else:
-                self.global_dict[word] += 1
+            self.update_global_dict(word)
+            return self.update_doc_dict(term_dict,word)
+        return term_dict
 
-
-            return True
-        return False
-
-    def fix_number(self,sentence):
+    def fix_number(self,sentence,term_dict):
             sentence=word_tokenize(sentence)
             #sentence = re.split(', |_|-|!|/| ', sentence)
             a=2
@@ -388,11 +375,27 @@ class Parse:
                             sentence[i] += "B"
                             sentence[i + 1] = ""
                     lst_piece_num.append(sentence[i])
-            sentence = ' '.join(map(str, sentence))
+                    term_dict=self.update_doc_dict(term_dict, sentence[i])
+            for word in lst_piece_num:
+                self.update_global_dict(word)
+            ##sentence = ' '.join(map(str, sentence[i]))
 
-            return sentence
+            return term_dict
 
-    def Hashtags_parse(self,text):
+    def update_doc_dict(self,term_dict,word):
+        if word not in term_dict.keys():
+            term_dict[word] = 1
+        else:
+            term_dict[word] += 1
+        return term_dict
+
+    def update_global_dict(self, word):
+        if word not in self.global_dict.keys():
+            self.global_dict[word] = 1
+        else:
+            self.global_dict[word] += 1
+
+    def Hashtags_parse(self,text,term_dict):
         """
         This function takes a  Hashtag world from document and break it into to list of word
         :param tag: Hashtag word from tweet.
@@ -407,6 +410,7 @@ class Parse:
         for term in lst:
             count+=1
             tag=term
+            flag=True
             if(len(tag)<=0 or tag[0]!='#'):
                 continue
             parseList=tag[1:]
@@ -415,23 +419,32 @@ class Parse:
             parseList = parseList.lower()
             secparseList= parseList.replace(' ','')
             split_tag= str.split(parseList, " ") + ['#' + secparseList]
-            if(count==len(lst)):
-                lst=lst[:len(lst)-1]+split_tag
-            else:
-                lst= lst[:count]+split_tag+lst[count:]
-        lst= ' '.join(map(str,lst))
-        return lst
+            for word in split_tag:
+                term_dict=self.update_doc_dict(term_dict,word)
+                if(flag):
+                    flag=False
+                    self.update_global_dict(word)
+        return term_dict
 
-    def percent_parse(self,strToParse):
+     ##       if(count==len(lst)):
+     ##           lst=lst[:len(lst)-1]+split_tag
+     ##       else:
+     ##           lst= lst[:count]+split_tag+lst[count:]
+     ##   lst= ' '.join(map(str,lst))
+       ## return lst
+
+    def percent_parse(self,sentence,term_dict):
         """
         This function change the representation of Number%,Number percent,Number percentage to Number%
         :param s:  word from tweet.
         :return:string in Format  Number% .
         """
-        #check if the number only in digit
-        strToParse = str.replace(strToParse, ' percentage', '%')
-        strToParse = str.replace(strToParse, ' PERCENTAGE', '%')
-        strToParse = str.replace(strToParse, ' PERCENT', '%')
-        strToParse = str.replace(strToParse, ' percent', '%')
-        return strToParse
+
+        sentence_lst = word_tokenize(sentence)
+        percent_op=[' percentage',' PERCENTAGE',' PERCENT',' percent']
+        for i in range(0,len(sentence_lst)):
+            if(str.isnumeric(sentence_lst[i] and i+1<len(sentence_lst)) and sentence_lst[i+1] in percent_op):
+                term_dict=self.update_doc_dict(term_dict,sentence_lst[i]+'%')
+                self.update_global_dict(sentence_lst[i]+'%')
+        return term_dict
 
