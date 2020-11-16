@@ -592,6 +592,16 @@ class Parse:
             self.update_global_dict(word)
 
     def stemmer(self,sentence):
-        '''
+        porter = PorterStemmer()
+        lancaster = LancasterStemmer()
 
-        '''
+        print("Porter Stemmer")
+        print(porter.stem("cats"))
+        print(porter.stem("trouble"))
+        print(porter.stem("troubling"))
+        print(porter.stem("troubled"))
+        print("Lancaster Stemmer")
+        print(lancaster.stem("cats"))
+        print(lancaster.stem("trouble"))
+        print(lancaster.stem("troubling"))
+        print(lancaster.stem("troubled"))
