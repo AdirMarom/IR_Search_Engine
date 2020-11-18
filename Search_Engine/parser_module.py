@@ -9,13 +9,13 @@ import re
 from nltk.stem import PorterStemmer
 from nltk.stem import LancasterStemmer
 
-
-##import spacy
+import spacy
 
 class Parse:
 
     def __init__(self):
-        self.stop_words = stopwords.words('english')+['?','!',',','',]
+        self.stop_words = stopwords.words('english')+['?','!',',']
+        self.nlp = spacy.load("en_core_web_sm")
         self.global_dict = {}
         self.garbage = []
 
@@ -195,8 +195,8 @@ class Parse:
         :param term_dict: the words dictionary of document
         :return:
         '''
-        nlp = spacy.load("en_core_web_sm")
-        doc = nlp(text)
+
+        doc = self.nlp(text)
         dict = {}
         flag = False
         for ent in doc.ents:
@@ -383,7 +383,7 @@ class Parse:
     def update_doc_dict(self, term_dict, word):
         if word not in term_dict.keys() and word not in self.stop_words:
             term_dict[word] = 1
-        else:
+        elif word not in self.stop_words:
             term_dict[word] += 1
         return term_dict
 
