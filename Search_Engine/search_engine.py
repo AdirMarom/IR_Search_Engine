@@ -39,10 +39,10 @@ def run_engine():
     for idx, document in enumerate(doc_list2):
 
         print(number_of_documents)
-        if (number_of_documents==1):
+        if (number_of_documents==5):
             a=4
         # parse the document
-        parsed_document = p.parse_doc(document)
+        parsed_document = p.parse_doc(document,idx)
         number_of_documents += 1
         # index the document data
        ## indexer.add_new_doc(parsed_document)

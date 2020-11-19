@@ -1,6 +1,7 @@
 class Indexer:
 
     def __init__(self, config):
+
         self.inverted_idx = {}
         self.postingDict = {}
         self.config = config
