@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 import spacy
 from nltk import pos_tag, RegexpParser
 from nltk.corpus import stopwords
+from nltk.data import path
 from nltk.tokenize import word_tokenize
 from document import Document
 import re
@@ -20,14 +21,81 @@ class Parse:
         self.global_dict = {}#key="word",value=number of docs
         self.post_dict = {}  # key="word",value=[parquet name,index in parquet,tweet id,frequency in tweet,location in tweet]
         self.garbage = []
+        self.id=[]
+        self.entities={}
 
-    def update_post_dict(self,term=False,doc_name=False,tweet_id=False,idx=False,freq=False,loc=False):
-        if(term!=False and term in self.global_dict):
-            if term not in self.post_dict:
-                self.post_dict[term]=[doc_name,idx,tweet_id,freq,[]]
+    def parse_doc(self, doc_as_list,idx=0,path=''):
+        """
+        This function takes a tweet document as list and break it into different fields
+        :param doc_as_list: list re-preseting the tweet.
+        :return: Document object with corresponding fields.
+        """
+        local_dict={}  # key="word",value=[parquet name,index in parquet,tweet id,frequency in tweet,location in tweet]
+        tweet_id = doc_as_list[0]
+        tweet_date = doc_as_list[1]
+        full_text = doc_as_list[2]
+        url = doc_as_list[3]
+        retweet_text = doc_as_list[4]
+        retweet_url = doc_as_list[5]
+        quote_text = doc_as_list[6]
+        quote_url = doc_as_list[7]
+        term_dict = {}
+        retweet_url = self.parse_url(retweet_url)
+        url = self.parse_url(url)
+        quote_url = self.parse_url(quote_url)
+        tokenized_text = self.parse_sentence(full_text)
+        for i in range(len(tokenized_text)):
+            if i < len(tokenized_text) - 1 and (tokenized_text[i] == '@' or tokenized_text[i] == '#'):
+                word = tokenized_text[i]
+                tokenized_text[i] = ''
+                tokenized_text[i + 1] = word + tokenized_text[i + 1]
+        if ('' in tokenized_text):
+            tokenized_text.remove('')
+
+
+        full_text = self.deEmojify(full_text)
+        g = []
+        # save #tag
+        tokenized_text = self.Hashtags_parse(tokenized_text)
+        # save word begin in @
+        ## term_dict = self.save_as_tag(tokenized_text)
+        # save numbers end with M K B
+        tokenized_text = self.fix_number(tokenized_text)
+        # save num%
+        tokenized_text = self.percent_parse(tokenized_text)
+        # save entity
+        self.find_entities(full_text)
+        w = 1
+        doc_length = len(tokenized_text)  # after text operations.
+
+        for i in range(doc_length):
+            self.update_global_dict(tokenized_text[i])
+            # lower upper case for global
+            self.upper_lower_case(tokenized_text[i])
+
+            if (str.isalpha(tokenized_text[i]) or tokenized_text[i].startswith('#') or tokenized_text[i].startswith('@')):
+                term_dict = self.update_doc_dict(term_dict, tokenized_text[i])
+                if tokenized_text[i] not in local_dict:
+                    local_dict[tokenized_text[i]]=[1,[i]]
+                else:
+                    local_dict[tokenized_text[i]][0]+=1
+                    local_dict[tokenized_text[i]][1].append(i)
+
             else:
-                self.post_dict[term][3]=freq
-                self.post_dict[term][4].append(loc)
+                g.append(tokenized_text[i])
+        self.update_post_dict(path,idx,tweet_id,local_dict)
+        a = 5
+        document = Document(tweet_id, tweet_date, full_text, url, retweet_text, retweet_url, quote_text,
+                            quote_url, term_dict, doc_length)
+        return document
+
+    def update_post_dict(self,path,idx,tweet_id,local_dict):
+        for term in local_dict.keys():
+            if(term in self.global_dict):
+                if term not in self.post_dict:
+                    self.post_dict[term]=[[path, idx, tweet_id, local_dict[term][0], local_dict[term][1]]]
+                else:
+                    self.post_dict[term].append([path, idx, tweet_id, local_dict[term][0], local_dict[term][1]])
 
     def parse_sentence(self, text):
         """
@@ -207,73 +275,44 @@ class Parse:
         :return:
         '''
         doc = self.nlp(text)
-        dict = {}
-        flag = False
         for ent in doc.ents:
             entity = str(ent)
-            if entity not in self.entities:
-                self.entities[entity] = 1
-            else:
-                self.entities[entity] += 1
+            if entity.isnumeric() == False:
+                if entity not in self.entities:
+                    self.entities[entity] = 1
+                else:
+                    self.entities[entity] += 1
+            splitted_ent = re.split(', |_|-|!| ', entity)
+            if(len(splitted_ent)>1):
+                for term in splitted_ent:
+                    if term.isnumeric() == False:
+                        if term in self.entities:
+                            self.entities[term]+=1
+                        else:
+                            self.entities[term]=1
 
-    def parse_doc(self, doc_as_list,idx=0):
-        """
-        This function takes a tweet document as list and break it into different fields
-        :param doc_as_list: list re-preseting the tweet.
-        :return: Document object with corresponding fields.
-        """
-        tweet_id = doc_as_list[0]
-        tweet_date = doc_as_list[1]
-        full_text = doc_as_list[2]
-        url = doc_as_list[3]
-        retweet_text = doc_as_list[4]
-        retweet_url = doc_as_list[5]
-        quote_text = doc_as_list[6]
-        quote_url = doc_as_list[7]
-        term_dict = {}
-        retweet_url = self.parse_url(retweet_url)
-        url = self.parse_url(url)
-        quote_url = self.parse_url(quote_url)
-
-        tokenized_text = self.parse_sentence(full_text)
-        for i in range(len(tokenized_text)):
-            if i<len(tokenized_text)-1 and (tokenized_text[i]=='@' or tokenized_text[i]=='#' ) :
-                word=tokenized_text[i]
-                tokenized_text[i]=''
-                tokenized_text[i+1]=word+tokenized_text[i+1]
-        if('' in tokenized_text):
-            tokenized_text.remove('')
-        doc_length = len(tokenized_text) # after text operations.
-
-
-        g = []
-        # save #tag
-        tokenized_text = self.Hashtags_parse(tokenized_text)
-        # save word begin in @
-       ## term_dict = self.save_as_tag(tokenized_text)
-        # save numbers end with M K B
-        tokenized_text = self.fix_number(tokenized_text)
-        # save num%
-        tokenized_text = self.percent_parse(tokenized_text)
-        # save entity
-       # self.find_entities(tokenized_text)
-        w=1
-        for term in tokenized_text:
-            self.upper_lower_case(term)
-
-        for term in tokenized_text:
-
-            # lower upper case for global
-            self.upper_lower_global_dict(term)
-
-            if (str.isalpha(term)):
-                term_dict = self.update_doc_dict(term_dict, term)
-            else:
-                g.append(term)
-        a = 5
-        document = Document(tweet_id, tweet_date, full_text, url, retweet_text, retweet_url, quote_text,
-                            quote_url, term_dict, doc_length)
-        return document
+    def deEmojify(self, text):
+        emoji_pattern = re.compile("["
+                                   u"\U0001F600-\U0001F64F"  # emoticons
+                                   u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                                   u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                                   u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                                   u"\U00002500-\U00002BEF"  # chinese char
+                                   u"\U00002702-\U000027B0"
+                                   u"\U00002702-\U000027B0"
+                                   u"\U000024C2-\U0001F251"
+                                   u"\U0001f926-\U0001f937"
+                                   u"\U00010000-\U0010ffff"
+                                   u"\u2640-\u2642"
+                                   u"\u2600-\u2B55"
+                                   u"\u200d"
+                                   u"\u23cf"
+                                   u"\u23e9"
+                                   u"\u231a"
+                                   u"\ufe0f"  # dingbats
+                                   u"\u3030"
+                                   "]+", flags=re.UNICODE)
+        return emoji_pattern.sub(r'', text)
 
     def upper_lower_global_dict(self, term):
         if (term.isalpha()):
@@ -396,20 +435,18 @@ class Parse:
                         toc_text[i + 1] = ""
         return toc_text
 
-    def update_doc_dict(self, term_dict, word, id=0):
-        if word not in term_dict.keys() and word not in self.stop_words:
+    def update_doc_dict(self, term_dict, word):
+        if word not in term_dict.keys() :
             term_dict[word] = 1
-        elif word not in self.stop_words:
+        else:
             term_dict[word] += 1
         return term_dict
 
-    def upper_lower_global_dict(self, word):
-        if word not in self.global_dict.keys() and word not in self.stop_words:
+    def update_global_dict(self, word):
+        if word not in self.global_dict.keys():
             self.global_dict[word] = 1
-        elif word not in self.stop_words:
-            self.global_dict[word] += 1
         else:
-            self.garbage.append(word)
+            self.global_dict[word] += 1
 
     def Hashtags_parse(self, toc_text):
         """
