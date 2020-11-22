@@ -38,15 +38,13 @@ def run_engine():
     # Iterate over every document in the file
     count=0
     for idx, document in enumerate(doc_list2):
-
-        print(number_of_documents)
-        if (number_of_documents==80):
-            a=4
+        if(number_of_documents%100000==0):
+            print(number_of_documents)
         # parse the document
-        parsed_document = p.parse_doc(document,idx,doc_list[count])
+        parsed_document = p.parse_doc(document,number_of_documents,doc_list[count])
         number_of_documents += 1
         # index the document data
-       ## indexer.add_new_doc(parsed_document)
+  #      indexer.add_new_doc(parsed_document,p.global_dict)
 
 
     print('Finished parsing and indexing. Starting to export files')

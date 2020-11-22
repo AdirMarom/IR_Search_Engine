@@ -43,17 +43,32 @@ class Parse:
         retweet_url = self.parse_url(retweet_url)
         url = self.parse_url(url)
         quote_url = self.parse_url(quote_url)
-        tokenized_text = self.parse_sentence(full_text)
-        for i in range(len(tokenized_text)):
-            if i < len(tokenized_text) - 1 and (tokenized_text[i] == '@' or tokenized_text[i] == '#'):
-                word = tokenized_text[i]
-                tokenized_text[i] = ''
-                tokenized_text[i + 1] = word + tokenized_text[i + 1]
+        full_text = self.deEmojify(full_text)
+        tokenized_text1 = full_text.split(' ')
+
+  #      tokenized_text1 =re.split(', |.|\n\n|\n| ',full_text)
+
+        tokenized_text=[]
+        for i in tokenized_text1:
+           if "\n\n" in i:
+               i=i.replace("\n\n",'')
+           if "\n" in i:
+               i=i.replace("\n",'')
+           if '.' in i:
+               i=i.replace(".",'')
+           if ',' in i:
+               i=i.replace(",",'')
+
+           if i not in self.stop_words:
+              tokenized_text.append(i)
+
+
         if ('' in tokenized_text):
             tokenized_text.remove('')
+        if(' ' in tokenized_text):
+            tokenized_text.remove(' ')
 
 
-        full_text = self.deEmojify(full_text)
         g = []
         # save #tag
         tokenized_text = self.Hashtags_parse(tokenized_text)
@@ -64,7 +79,7 @@ class Parse:
         # save num%
         tokenized_text = self.percent_parse(tokenized_text)
         # save entity
-        self.find_entities(full_text)
+        #self.find_entities(full_text)
         w = 1
         doc_length = len(tokenized_text)  # after text operations.
 
@@ -83,7 +98,7 @@ class Parse:
 
             else:
                 g.append(tokenized_text[i])
-        self.update_post_dict(path,idx,tweet_id,local_dict)
+       # self.update_post_dict(path,idx,tweet_id,local_dict)
         a = 5
         document = Document(tweet_id, tweet_date, full_text, url, retweet_text, retweet_url, quote_text,
                             quote_url, term_dict, doc_length)
@@ -383,19 +398,15 @@ class Parse:
 
     def fix_number(self, toc_text):
         # sentence = re.split(', |_|-|!|/| ', sentence)
-        a = 2
-        lst_piece_num = []
         for i in range(len(toc_text)):
             if (re.search(r"\d", toc_text[i])):
                 if (i + 1 != len(toc_text) and toc_text[i + 1] != "Thousand" and toc_text[i + 1] != "Million" and
                         toc_text[i + 1] != "Billion"):
                     num = toc_text[i]
                     num = num.replace(',', '')
-                    if (num.isnumeric() == False):
-                        continue
                     flag = False
                     for digit in range(len(num)):
-                        if (num[digit].isdigit() == False):
+                        if (num[digit].isdigit() == False and num[digit]!='.'):
                             flag = True;
                     if (flag):
                         continue
