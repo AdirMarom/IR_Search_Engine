@@ -1,11 +1,30 @@
 
 class Indexer:
 
-    def __init__(self, config):
+    def _init_(self, config):
 
-        self.inverted_idx={}
-        self.postingDict={}
+        self.inverted_idx = {}
+        self.postingDict = {}
+        self.garbage=[]
         self.config = config
+
+
+    def update_inverted_dict(self, dict):
+        for term in dict:
+            if (term.isalpha()):
+                if term in self.inverted_idx.keys():
+                    if str.isupper(term[0]):
+                        if term.lower() in self.inverted_idx.keys():
+                            self.inverted_idx[term.lower()] += self.inverted_idx[term] + dict[term]
+                            del self.inverted_idx[term]
+                        else:
+                            self.inverted_idx[term] += dict[term]
+                    else:
+                        self.inverted_idx[term] = self.inverted_idx[term] + dict[term]
+                else:
+                    self.inverted_idx[term] = dict[term]
+            else:
+                self.garbage.append(term)
 
     def add_new_doc(self, document,dict):
         """

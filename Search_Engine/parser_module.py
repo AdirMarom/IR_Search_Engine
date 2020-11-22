@@ -1,4 +1,5 @@
 import copy
+import math
 from urllib.parse import urlparse
 import spacy
 from nltk import pos_tag, RegexpParser
@@ -14,15 +15,21 @@ import spacy
 
 class Parse:
 
-    def __init__(self):
+    def _init_(self):
 
-        self.stop_words = stopwords.words('english')+['?','!',',','+','-','*','/','"','.','<','>','=',':','']
+        self.stop_words = stopwords.words('english') + ['?', '!', ',', '+', '-', '*', '/', '"', '.', '<', '>', '=', ':',
+                                                        '']
         self.nlp = spacy.load("en_core_web_sm")
-        self.global_dict = {}#key="word",value=number of docs
+        self.global_dict = {}  # key="word",value=number of docs
         self.post_dict = {}  # key="word",value=[parquet name,index in parquet,tweet id,frequency in tweet,location in tweet]
         self.garbage = []
-        self.id=[]
-        self.entities={}
+        self.id = []
+        self.entities = {}
+        self.ae_post_dict = {}
+        self.fn_post_dict = {}
+        self.os_post_dict = {}
+        self.tz_post_dict = {}
+        self.else_post_dict = {}
 
     def parse_doc(self, doc_as_list,idx=0,path=''):
         """
@@ -396,53 +403,63 @@ class Parse:
                 self.update_doc_dict(term_dict, word)
         return term_dict
 
-    def fix_number(self, toc_text):
+    def truncate(self,number, digits) -> float:
+        stepper = 10.0 ** digits
+        return math.trunc(stepper * number) / stepper
+
+    def fix_number(self,toc_text):
         # sentence = re.split(', |_|-|!|/| ', sentence)
         for i in range(len(toc_text)):
             if (re.search(r"\d", toc_text[i])):
-                if (i + 1 != len(toc_text) and toc_text[i + 1] != "Thousand" and toc_text[i + 1] != "Million" and
-                        toc_text[i + 1] != "Billion"):
-                    num = toc_text[i]
-                    num = num.replace(',', '')
-                    flag = False
-                    for digit in range(len(num)):
-                        if (num[digit].isdigit() == False and num[digit]!='.'):
-                            flag = True;
-                    if (flag):
-                        continue
+                num = toc_text[i]
+                num = num.replace(',', '')
+                flag = False
+                for digit in range(len(num)):
+                    if (num[digit].isdigit() == False and num[digit] != '.'):
+                        flag = True
+                if (flag):
+                    continue
 
-                    if (num.isnumeric()):
-                        num = float(num)
-                        if (1000 <= num < 1000000):
-                            num = num / 1000
-                            toc_text[i] = "%.3f" % num + "K"
+                num = float(num)
+                flag1 = False
+                if (1000 <= num < 1000000):
+                    flag1 = True
+                    num = num / 1000
+                    num = str(self.truncate(num, 3)) + "K"
 
-                        elif (1000000 <= num < 1000000000):
-                            num = num / 1000000
-                            toc_text[i] = "%.3f" % num + "M"
-                        elif (num > 1000000000):
-                            toc_text[i] = num / 1000000000
-                            toc_text[i] = "%.3f" % num + "B"
-                        if (len(toc_text[i]) >= 2 and toc_text[i][-2] == '0'):
-                            toc_text[i] = toc_text[i][0:-2] + toc_text[i][-1]
-                            if (len(toc_text[i]) >= 2 and toc_text[i][-2] == '0'):
-                                toc_text[i] = toc_text[i][0:-2] + toc_text[i][-1]
-                                if (len(toc_text[i]) >= 2 and toc_text[i][-2] == '0'):
-                                    toc_text[i] = toc_text[i][0:-2] + toc_text[i][-1]
-                                    if (len(toc_text[i]) >= 2 and toc_text[i][-2] == '.'):
-                                        toc_text[i] = toc_text[i][0:-2] + toc_text[i][-1]
+                elif (1000000 <= num < 1000000000):
+                    flag1 = True
+                    num = num / 1000000
+                    num = str(self.truncate(num, 3)) + "M"
+                elif (num > 1000000000):
+                    flag1 = True
+                    num = num / 1000000000
+                    num = str(self.truncate(num, 3)) + "B"
+                num = str(num)
+                if (flag1 == False):
+                    if (num[-1] == "0"):
+                        num = num[0:-1]
+                        if (num[-1] == "."):
+                            num = num[0:-1]
+                if (flag):
+                    if (num[-2] == "0"):
+                        num = num[0:-2] + num[-1:]
+                        if (num[-1] == "."):
+                            num = num[0:-2] + num[-1:]
+
+                toc_text[i] = num
 
                 if (i + 1 == len(toc_text)):
                     break
                 else:
                     if (toc_text[i + 1] == "Thousand" or toc_text[i + 1] == "thousand"):
-                        toc_text[i] += "K"
+                        toc_text[i] = str(toc_text[i]) + "K"
                         toc_text[i + 1] = ""
                     elif (toc_text[i + 1] == "Million" or toc_text[i + 1] == "million"):
-                        toc_text[i] += "M"
+                        toc_text[i] = str(toc_text[i]) + "M"
                         toc_text[i + 1] = ""
                     elif (toc_text[i + 1] == "Billion" or toc_text[i + 1] == "billion"):
-                        toc_text[i] += "B"
+                        toc_text[i] = str(toc_text[i]) + "B"
                         toc_text[i + 1] = ""
         return toc_text
 
@@ -676,3 +693,40 @@ class Parse:
         print(lancaster.stem("trouble"))
         print(lancaster.stem("troubling"))
         print(lancaster.stem("troubled"))
+
+    def update_post_dict(self, path, idx, tweet_id, local_dict):
+        for term in local_dict.keys():
+            if (term in self.global_dict):
+                if 'a' <= term[0].lower() <= 'e':
+                    if term not in self.ae_post_dict:
+                        self.ae_post_dict[term] = [[path, idx, tweet_id, local_dict[term][0], local_dict[term][1]]]
+                    else:
+                        self.ae_post_dict[term].append([path, idx, tweet_id, local_dict[term][0], local_dict[term][1]])
+
+                elif 'f' <= term[0].lower() <= 'n':
+                    if term not in self.fn_post_dict:
+                        self.fn_post_dict[term] = [[path, idx, tweet_id, local_dict[term][0], local_dict[term][1]]]
+                    else:
+                        self.fn_post_dict[term].append([path, idx, tweet_id, local_dict[term][0], local_dict[term][1]])
+
+                elif 'o' <= term[0].lower() <= 's':
+                    if term not in self.os_post_dict:
+                        self.os_post_dict[term] = [[path, idx, tweet_id, local_dict[term][0], local_dict[term][1]]]
+                    else:
+                        self.os_post_dict[term].append([path, idx, tweet_id, local_dict[term][0], local_dict[term][1]])
+
+                elif 't' <= term[0].lower() <= 'z':
+                    if term not in self.tz_post_dict:
+                        self.tz_post_dict[term] = [[path, idx, tweet_id, local_dict[term][0], local_dict[term][1]]]
+                    else:
+                        self.tz_post_dict[term].append([path, idx, tweet_id, local_dict[term][0], local_dict[term][1]])
+
+                else:
+                    if term not in self.else_post_dict:
+                        self.else_post_dict[term] = [[path, idx, tweet_id, local_dict[term][0], local_dict[term][1]]]
+                    else:
+                        self.else_post_dict[term].append(
+                            [path, idx, tweet_id, local_dict[term][0], local_dict[term][1]])
+
+    def get_global_dict(self):
+        return self.global_dict
