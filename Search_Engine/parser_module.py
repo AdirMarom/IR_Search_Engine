@@ -15,7 +15,7 @@ import spacy
 
 class Parse:
 
-    def _init_(self):
+    def __init__(self):
 
         self.stop_words = stopwords.words('english') + ['?', '!', ',', '+', '-', '*', '/', '"', '.', '<', '>', '=', ':',
                                                         '']
@@ -420,47 +420,51 @@ class Parse:
                 if (flag):
                     continue
 
-                num = float(num)
-                flag1 = False
-                if (1000 <= num < 1000000):
-                    flag1 = True
-                    num = num / 1000
-                    num = str(self.truncate(num, 3)) + "K"
+                try :
+                    num = float(num)
+                    flag1 = False
+                    if (1000 <= num < 1000000):
+                        flag1 = True
+                        num = num / 1000
+                        num = str(self.truncate(num, 3)) + "K"
 
-                elif (1000000 <= num < 1000000000):
-                    flag1 = True
-                    num = num / 1000000
-                    num = str(self.truncate(num, 3)) + "M"
-                elif (num > 1000000000):
-                    flag1 = True
-                    num = num / 1000000000
-                    num = str(self.truncate(num, 3)) + "B"
-                num = str(num)
-                if (flag1 == False):
-                    if (num[-1] == "0"):
-                        num = num[0:-1]
-                        if (num[-1] == "."):
+                    elif (1000000 <= num < 1000000000):
+                        flag1 = True
+                        num = num / 1000000
+                        num = str(self.truncate(num, 3)) + "M"
+                    elif (num > 1000000000):
+                        flag1 = True
+                        num = num / 1000000000
+                        num = str(self.truncate(num, 3)) + "B"
+                    num = str(num)
+                    if (flag1 == False):
+                        if (num[-1] == "0"):
                             num = num[0:-1]
-                if (flag):
-                    if (num[-2] == "0"):
-                        num = num[0:-2] + num[-1:]
-                        if (num[-1] == "."):
+                            if (num[-1] == "."):
+                                num = num[0:-1]
+                    if (flag):
+                        if (num[-2] == "0"):
                             num = num[0:-2] + num[-1:]
+                            if (num[-1] == "."):
+                                num = num[0:-2] + num[-1:]
 
-                toc_text[i] = num
+                    toc_text[i] = num
 
-                if (i + 1 == len(toc_text)):
-                    break
-                else:
-                    if (toc_text[i + 1] == "Thousand" or toc_text[i + 1] == "thousand"):
-                        toc_text[i] = str(toc_text[i]) + "K"
-                        toc_text[i + 1] = ""
-                    elif (toc_text[i + 1] == "Million" or toc_text[i + 1] == "million"):
-                        toc_text[i] = str(toc_text[i]) + "M"
-                        toc_text[i + 1] = ""
-                    elif (toc_text[i + 1] == "Billion" or toc_text[i + 1] == "billion"):
-                        toc_text[i] = str(toc_text[i]) + "B"
-                        toc_text[i + 1] = ""
+                    if (i + 1 == len(toc_text)):
+                        break
+                    else:
+                        if (toc_text[i + 1] == "Thousand" or toc_text[i + 1] == "thousand"):
+                            toc_text[i] = str(toc_text[i]) + "K"
+                            toc_text[i + 1] = ""
+                        elif (toc_text[i + 1] == "Million" or toc_text[i + 1] == "million"):
+                            toc_text[i] = str(toc_text[i]) + "M"
+                            toc_text[i + 1] = ""
+                        elif (toc_text[i + 1] == "Billion" or toc_text[i + 1] == "billion"):
+                            toc_text[i] = str(toc_text[i]) + "B"
+                            toc_text[i + 1] = ""
+                except:
+                    continue
+
         return toc_text
 
     def update_doc_dict(self, term_dict, word):
