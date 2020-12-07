@@ -1,8 +1,4 @@
-import parser_module
 import search_engine
 
-from Search_Engine.parser_module import Parse
-
 if __name__ == '__main__':
-    par=Parse()
-    search_engine.main()
+    search_engine.main('C:\\Users\\Ben Rozilio\\Desktop\\SemA\\engine\\Data\\Data2','output_path',True,'C:\\Users\\Ben Rozilio\\Desktop\\SemA\\engine\\queries.txt',5)

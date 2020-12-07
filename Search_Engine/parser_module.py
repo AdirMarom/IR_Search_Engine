@@ -1,37 +1,23 @@
-import copy
 import math
-from urllib.parse import urlparse
-import spacy
-from nltk import pos_tag, RegexpParser
 from nltk.corpus import stopwords
-from nltk.data import path
-from nltk.tokenize import word_tokenize
-from document import Document
 import re
-from nltk.stem import PorterStemmer
-from nltk.stem import LancasterStemmer
-
-import spacy
+from stemmer import Stemmer
 
 class Parse:
+    """
+    Parsing, syntax analysis, or syntactic analysis is the process of analyzing a string of symbols, either in natural language,
+     computer languages or data structures, conforming to the rules of a formal grammar.
+    The term parsing comes from Latin pars
+    """
 
     def __init__(self):
-
-        self.stop_words = stopwords.words('english') + ['?', '!', ',', '+', '-', '*', '/', '"', '.', '<', '>', '=', ':',
-                                                        '']
-        self.nlp = spacy.load("en_core_web_sm")
-        self.global_dict = {}  # key="word",value=number of docs
-        self.post_dict = {}  # key="word",value=[parquet name,index in parquet,tweet id,frequency in tweet,location in tweet]
-        self.garbage = []
-        self.id = []
+        self.tmp_for_entites = {}
+        self.stop_words = stopwords.words('english') + ['?', '!', ',', '+', '-', '*', '/', '"', '.', '<', '>', '=', ':','','{','{}','}','[',']','[]','are','and','an','at','am','a','even','every','everyone']
+        self.global_dict = {}  #value=number of docs
+        self.post_dict = {}  # key="word",value=[parquet name,index in parquet,tweet id,frequency in tweet,location in tweet,tf]
         self.entities = {}
-        self.ae_post_dict = {}
-        self.fn_post_dict = {}
-        self.os_post_dict = {}
-        self.tz_post_dict = {}
-        self.else_post_dict = {}
 
-    def parse_doc(self, doc_as_list,idx=0,path=''):
+    def parse_doc(self, doc_as_list,with_stem=False):
         """
         This function takes a tweet document as list and break it into different fields
         :param doc_as_list: list re-preseting the tweet.
@@ -46,92 +32,59 @@ class Parse:
         retweet_url = doc_as_list[5]
         quote_text = doc_as_list[6]
         quote_url = doc_as_list[7]
+        if str(full_text).startswith("RT"): #if the tweet is RT and not hold more text (just share) pass
+            return False
         term_dict = {}
-        retweet_url = self.parse_url(retweet_url)
         url = self.parse_url(url)
-        quote_url = self.parse_url(quote_url)
-        full_text = self.deEmojify(full_text)
-        tokenized_text1 = full_text.split(' ')
+        tokenized_text=self.tokenized_parse(full_text)+url
 
-  #      tokenized_text1 =re.split(', |.|\n\n|\n| ',full_text)
+        if with_stem:
+            stem=Stemmer()
+            tokenized_text=stem.stem_term(tokenized_text)
 
-        tokenized_text=[]
-        for i in tokenized_text1:
-           if "\n\n" in i:
-               i=i.replace("\n\n",'')
-           if "\n" in i:
-               i=i.replace("\n",'')
-           if '.' in i:
-               i=i.replace(".",'')
-           if ',' in i:
-               i=i.replace(",",'')
-
-           if i not in self.stop_words:
-              tokenized_text.append(i)
-
-
-        if ('' in tokenized_text):
-            tokenized_text.remove('')
-        if(' ' in tokenized_text):
-            tokenized_text.remove(' ')
-
-
-        g = []
-        # save #tag
-        tokenized_text = self.Hashtags_parse(tokenized_text)
-        # save word begin in @
-        ## term_dict = self.save_as_tag(tokenized_text)
-        # save numbers end with M K B
-        tokenized_text = self.fix_number(tokenized_text)
-        # save num%
-        tokenized_text = self.percent_parse(tokenized_text)
-        # save entity
-        #self.find_entities(full_text)
-        w = 1
         doc_length = len(tokenized_text)  # after text operations.
-
+        unique_words=set()
         for i in range(doc_length):
-            self.update_global_dict(tokenized_text[i])
-            # lower upper case for global
-            self.upper_lower_case(tokenized_text[i])
-
-            if (str.isalpha(tokenized_text[i]) or tokenized_text[i].startswith('#') or tokenized_text[i].startswith('@')):
-                term_dict = self.update_doc_dict(term_dict, tokenized_text[i])
-                if tokenized_text[i] not in local_dict:
-                    local_dict[tokenized_text[i]]=[1,[i]]
-                else:
-                    local_dict[tokenized_text[i]][0]+=1
-                    local_dict[tokenized_text[i]][1].append(i)
-
+            if len(tokenized_text[i])<=1:
+                continue
+            unique_words.add(tokenized_text[i])
+            term_dict = self.update_doc_dict(term_dict, tokenized_text[i].lower())
+            if tokenized_text[i].lower() not in local_dict:
+                local_dict[tokenized_text[i].lower()]=[1,[i]]
             else:
-                g.append(tokenized_text[i])
-       # self.update_post_dict(path,idx,tweet_id,local_dict)
-        a = 5
-        document = Document(tweet_id, tweet_date, full_text, url, retweet_text, retweet_url, quote_text,
-                            quote_url, term_dict, doc_length)
-        return document
+                local_dict[tokenized_text[i].lower()][0]+=1
+                local_dict[tokenized_text[i].lower()][1].append(i)
+        if term_dict=={}:
+            return False
 
-    def update_post_dict(self,path,idx,tweet_id,local_dict):
-        for term in local_dict.keys():
-            if(term in self.global_dict):
-                if term not in self.post_dict:
-                    self.post_dict[term]=[[path, idx, tweet_id, local_dict[term][0], local_dict[term][1]]]
-                else:
-                    self.post_dict[term].append([path, idx, tweet_id, local_dict[term][0], local_dict[term][1]])
+        for term in unique_words:
+           if term[0].isupper():
+               term=term.upper()
+           else:
+               term=term.lower()
+           self.update_global_dict(term)
+        self.update_post_dict(tweet_id,local_dict,term_dict,tweet_date)
+        self.update_entity_global_dict()
+        return True
 
-    def parse_sentence(self, text):
-        """
-        This function tokenize, remove stop words and apply lower case for every word within the text
-        :param text:
-        :return:
-        """
+    def update_entity_global_dict(self):
+        tmp = sorted(self.entities.items(), key=lambda x: x[1], reverse=True)
+        entity = []
+        for i in tmp:
+            if tmp[i][1] < 2:
+                entity = tmp[:i]
+        for word in entity:
+            if word[0] not in self.global_dict:
+                self.global_dict[word[0]] = word[1]
+            else:
+                self.global_dict[word[0]] += word[1]
+            self.entities.pop(word[0])
 
-        text_tokens = word_tokenize(text)
-        text_tokens_without_stopwords = [w for w in text_tokens if w not in self.stop_words]
-        text_tokens_without_stopwords_ = [self.extand_contractions(w.lower()) for w in text_tokens if
-                                          w not in self.stop_words]
-        for text in text_tokens_without_stopwords: text = self.extand_contractions(text)
-        return text_tokens_without_stopwords
+    def update_entity_dict(self, term):
+        if term in self.tmp_for_entites.keys():
+            self.tmp_for_entites[term] += 1
+        else:
+            self.tmp_for_entites[term] = 1
 
     def extand_contractions(self, word):
         '''
@@ -284,36 +237,12 @@ class Parse:
             "YOLO": "You Only Live Once",
             "WTH ": "What The Heck",
         }
-        if (word in contractions.keys()):
+        if (word in contractions):
             return contractions[word]
         return word
 
-    def find_entities(self, text):
-
-        '''
-        this function find entities and add them to the dictionary
-        :param text: the twit text
-        :param term_dict: the words dictionary of document
-        :return:
-        '''
-        doc = self.nlp(text)
-        for ent in doc.ents:
-            entity = str(ent)
-            if entity.isnumeric() == False:
-                if entity not in self.entities:
-                    self.entities[entity] = 1
-                else:
-                    self.entities[entity] += 1
-            splitted_ent = re.split(', |_|-|!| ', entity)
-            if(len(splitted_ent)>1):
-                for term in splitted_ent:
-                    if term.isnumeric() == False:
-                        if term in self.entities:
-                            self.entities[term]+=1
-                        else:
-                            self.entities[term]=1
-
     def deEmojify(self, text):
+        "remove the emojipy"
         emoji_pattern = re.compile("["
                                    u"\U0001F600-\U0001F64F"  # emoticons
                                    u"\U0001F300-\U0001F5FF"  # symbols & pictographs
@@ -336,32 +265,6 @@ class Parse:
                                    "]+", flags=re.UNICODE)
         return emoji_pattern.sub(r'', text)
 
-    def upper_lower_global_dict(self, term):
-        if (term.isalpha()):
-            if term in self.global_dict.keys():
-                if str.isupper(term[0]):
-                    if term.lower() in self.global_dict.keys():
-                        self.global_dict[term.lower()] += self.global_dict[term] + 1
-                        del self.global_dict[term]
-                    else:
-                        self.global_dict[term] += 1
-                else:
-                    self.global_dict[term] = self.global_dict[term] + 1
-            else:
-                self.global_dict[term] = 1
-        else:
-            self.garbage.append(term)
-
-    def upper_lower_case(self, word):
-        if (len(word)==0 or word[0].isalpha() == False):
-            return
-        word_status = (0, 0)
-        if (word[0].isupper()):
-            word_status = (word, 1)
-        else:
-            word_status = (word, 0)
-        word = word.lower()
-
     def parse_url(self, url_string):
         """
         This function takes a  url_string from document and break it into to list of word :
@@ -369,116 +272,115 @@ class Parse:
         :param tag: Hashtag word from tweet.
         :return: list include spread world from the url .
         """
-        if (url_string is None or url_string is ''):
-            return
-        lst = []
-        o = urlparse(url_string)
-        scheme = o.scheme
-        lst.append(scheme)
-        netloc = re.split(', |_|-|!', o.netloc)[0]
-        if ("www." in netloc):
-            netloc1 = netloc[0:3]
-            netloc2 = netloc[4:]
-            lst.append(netloc1)
-            lst.append(netloc2)
-        else:
-            lst.append(netloc)
-        path = re.split(', |_|-|!|/', o.path)
-        for i in range(len(path)):
-            if (path[i] != ''):
-                lst.append(path[i])
+        if str(url_string).__contains__('t.co') or str(url_string).__contains__('twitter') or len(url_string)<3 :
+            return []
+        tmp_word = ""
+        word_list = [url_string]
+        url = url_string.replace("//", "/")
+        for i in range(len(url)):
+            if (url[i] == "/" or url[i] == "-" or url[i] == "_"):
+                word_list.append(tmp_word)
+                tmp_word = ""
+            elif i != len(url) - 1:
+                tmp_word = tmp_word + url[i]
+            else:
 
-        query = re.split(', |_|-|!|=', o.query)
-        for j in range(len(query)):
-            if (query[j] != ''):
-                lst.append(query[j])
+                word_list.append(tmp_word)
+                if len(word_list)>2:
+                    word_list=word_list[2:]
 
-        return ' '.join(map(str, lst))
 
-    def save_as_tag(self, full_text, term_dict):
-        splitter = full_text.split()
-        for word in splitter:
-            if (word.startswith('@') and len(word) > 1):
-                self.upper_lower_global_dict(word)
-                self.update_doc_dict(term_dict, word)
-        return term_dict
+        return word_list
 
     def truncate(self,number, digits) -> float:
         stepper = 10.0 ** digits
         return math.trunc(stepper * number) / stepper
 
     def fix_number(self,toc_text):
-        # sentence = re.split(', |_|-|!|/| ', sentence)
+        """
+        convert
+        3000 ->3K
+        3,000,000->3m
+
+        :param toc_text: get the tokenizerd text
+        :return:
+        """
+
         for i in range(len(toc_text)):
-            if (re.search(r"\d", toc_text[i])):
-                num = toc_text[i]
-                num = num.replace(',', '')
+            num = toc_text[i]
+            num = num.replace(',', '')
+            if(num.isnumeric()):
                 flag = False
                 for digit in range(len(num)):
                     if (num[digit].isdigit() == False and num[digit] != '.'):
                         flag = True
                 if (flag):
                     continue
-
-                try :
+                try:
                     num = float(num)
-                    flag1 = False
-                    if (1000 <= num < 1000000):
-                        flag1 = True
-                        num = num / 1000
-                        num = str(self.truncate(num, 3)) + "K"
-
-                    elif (1000000 <= num < 1000000000):
-                        flag1 = True
-                        num = num / 1000000
-                        num = str(self.truncate(num, 3)) + "M"
-                    elif (num > 1000000000):
-                        flag1 = True
-                        num = num / 1000000000
-                        num = str(self.truncate(num, 3)) + "B"
-                    num = str(num)
-                    if (flag1 == False):
-                        if (num[-1] == "0"):
-                            num = num[0:-1]
-                            if (num[-1] == "."):
-                                num = num[0:-1]
-                    if (flag):
-                        if (num[-2] == "0"):
-                            num = num[0:-2] + num[-1:]
-                            if (num[-1] == "."):
-                                num = num[0:-2] + num[-1:]
-
-                    toc_text[i] = num
-
-                    if (i + 1 == len(toc_text)):
-                        break
-                    else:
-                        if (toc_text[i + 1] == "Thousand" or toc_text[i + 1] == "thousand"):
-                            toc_text[i] = str(toc_text[i]) + "K"
-                            toc_text[i + 1] = ""
-                        elif (toc_text[i + 1] == "Million" or toc_text[i + 1] == "million"):
-                            toc_text[i] = str(toc_text[i]) + "M"
-                            toc_text[i + 1] = ""
-                        elif (toc_text[i + 1] == "Billion" or toc_text[i + 1] == "billion"):
-                            toc_text[i] = str(toc_text[i]) + "B"
-                            toc_text[i + 1] = ""
                 except:
                     continue
+                flag1 = False
+                if (1000 <= num < 1000000):
+                    flag1 = True
+                    num = num / 1000
+                    num = str(self.truncate(num, 3)) + "K"
 
+                elif (1000000 <= num < 1000000000):
+                    flag1 = True
+                    num = num / 1000000
+                    num = str(self.truncate(num, 3)) + "M"
+                elif (num > 1000000000):
+                    flag1 = True
+                    num = num / 1000000000
+                    num = str(self.truncate(num, 3)) + "B"
+                num = str(num)
+                if (flag1 == False):
+                    if (num[-1] == "0"):
+                        num = num[0:-1]
+                        if (num[-1] == "."):
+                            num = num[0:-1]
+                if (flag):
+                    if (num[-2] == "0"):
+                        num = num[0:-2] + num[-1:]
+                        if (num[-1] == "."):
+                            num = num[0:-2] + num[-1:]
+
+                toc_text[i] = num
+
+                if (i + 1 == len(toc_text)):
+                    break
+                else:
+                    if (toc_text[i + 1] == "Thousand" or toc_text[i + 1] == "thousand"):
+                        toc_text[i] = str(toc_text[i]) + "K"
+                        toc_text[i + 1] = ""
+                    elif (toc_text[i + 1] == "Million" or toc_text[i + 1] == "million"):
+                        toc_text[i] = str(toc_text[i]) + "M"
+                        toc_text[i + 1] = ""
+                    elif (toc_text[i + 1] == "Billion" or toc_text[i + 1] == "billion"):
+                        toc_text[i] = str(toc_text[i]) + "B"
+                        toc_text[i + 1] = ""
         return toc_text
 
     def update_doc_dict(self, term_dict, word):
-        if word not in term_dict.keys() :
+        #try:
+        if word not in term_dict :
             term_dict[word] = 1
         else:
+        #except:
             term_dict[word] += 1
         return term_dict
 
     def update_global_dict(self, word):
-        if word not in self.global_dict.keys():
+        """
+        cheack if word in the dict if not save
+        :param word:
+        :return:
+        """
+        if word not in self.global_dict:
             self.global_dict[word] = 1
         else:
-            self.global_dict[word] += 1
+            self.global_dict[word]+= 1
 
     def Hashtags_parse(self, toc_text):
         """
@@ -487,7 +389,9 @@ class Parse:
         :return: list include spread world and #tag .
         """
 
-        copy_toc_text=copy.deepcopy(toc_text)
+        copy_toc_text=[]
+        for term in toc_text:
+            copy_toc_text.append(term)
         count = 0
         parseList = ''
         i=0
@@ -499,10 +403,10 @@ class Parse:
                 continue
             parseList = tag[1:]
             parseList = str.replace(parseList, '_', '')
-            parseList = re.sub(r"([A-Z])", r" \1", parseList)
-            parseList = parseList.lower()
-            secparseList = parseList.replace(' ', '')
-            split_tag = str.split(parseList, " ") + ['#' + secparseList]
+            #parseList = re.sub(r"([A-Z])", r" \1", parseList)
+            #parseList=self.sub_by_upper(parseList)
+            #secparseList = parseList.replace(' ', '')
+            split_tag = self.sub_by_upper(parseList) + ['#' + parseList.lower()]
             if('' in split_tag):
                 split_tag.remove('')
                 count-=1
@@ -520,35 +424,28 @@ class Parse:
               #     self.upper_lower_global_dict(word)
         return copy_toc_text
 
-    ##       if(count==len(lst)):
-    ##           lst=lst[:len(lst)-1]+split_tag
-    ##       else:
-    ##           lst= lst[:count]+split_tag+lst[count:]
-    ##   lst= ' '.join(map(str,lst))
-    ## return lst
-
     def percent_parse(self, toc_text):
         """
         This function change the representation of Number%,Number percent,Number percentage to Number%
         :param s:  word from tweet.
         :return:string in Format  Number% .
         """
-
-
         percent_op = [' percentage', ' PERCENTAGE', ' PERCENT', ' percent']
         for i in range(0, len(toc_text)):
             if (str.isnumeric(toc_text[i]) and i + 1 < len(toc_text) and toc_text[i + 1] in percent_op):
-                term_dict = self.update_doc_dict(term_dict, toc_text[i] + '%')
-                self.upper_lower_global_dict(toc_text[i] + '%')
+                toc_text[i]=toc_text[i] + '%'
+                toc_text[i+1]=""
+                #term_dict = self.update_doc_dict(term_dict, toc_text[i] + '%')
+                #self.upper_lower_global_dict(toc_text[i] + '%')
         return toc_text
 
-    def currency_parse(self, sentence, term_dict):
+    def currency_parse(self, term):
         """
               This function converting string currency to multiple ways to show it
               :param sentence:  thw sentece we look up for currency show
               :return:same sentence with extends, $-->$,usd,us dollar .
               """
-        curr_lst = []
+
         currency_dict = {
             'ALL': 'Albania Lek',
             'AFN': 'Afghanistan Afghani',
@@ -664,73 +561,138 @@ class Parse:
             'VND': 'Viet Nam Dong',
             'YER': 'Yemen Rial',
             'ZWD': 'Zimbabwe Dollar'}
-        sentence = word_tokenize(sentence)
-        for i in range(len(sentence)):
-            if (sentence[i] in currency_dict):
-                cur = sentence[i]
-                term_dict = self.update_doc_dict(term_dict, cur)
-                term_dict = self.update_doc_dict(term_dict, currency_dict[cur])
-                curr_lst.append(cur, currency_dict[cur])
-                self.upper_lower_global_dict(cur)
-                self.upper_lower_global_dict(currency_dict[cur])
-            elif (sentence[i] in currency_dict.values()):
-                cur = sentence[i]
-                term_dict = self.update_doc_dict(term_dict, cur)
-                term_dict = self.update_doc_dict(term_dict, currency_dict[cur])
-                curr_lst.append(cur, currency_dict[cur])
-                self.upper_lower_global_dict(cur)
-                self.upper_lower_global_dict(currency_dict[cur])
-        for word in curr_lst:
-            self.upper_lower_global_dict(word)
+        if term in currency_dict:
+            return currency_dict[term]
+        return term
 
-    def stemmer(self, sentence):
-        porter = PorterStemmer()
-        lancaster = LancasterStemmer()
-
-        print("Porter Stemmer")
-        print(porter.stem("cats"))
-        print(porter.stem("trouble"))
-        print(porter.stem("troubling"))
-        print(porter.stem("troubled"))
-        print("Lancaster Stemmer")
-        print(lancaster.stem("cats"))
-        print(lancaster.stem("trouble"))
-        print(lancaster.stem("troubling"))
-        print(lancaster.stem("troubled"))
-
-    def update_post_dict(self, path, idx, tweet_id, local_dict):
-        for term in local_dict.keys():
-            if (term in self.global_dict):
-                if 'a' <= term[0].lower() <= 'e':
-                    if term not in self.ae_post_dict:
-                        self.ae_post_dict[term] = [[path, idx, tweet_id, local_dict[term][0], local_dict[term][1]]]
-                    else:
-                        self.ae_post_dict[term].append([path, idx, tweet_id, local_dict[term][0], local_dict[term][1]])
-
-                elif 'f' <= term[0].lower() <= 'n':
-                    if term not in self.fn_post_dict:
-                        self.fn_post_dict[term] = [[path, idx, tweet_id, local_dict[term][0], local_dict[term][1]]]
-                    else:
-                        self.fn_post_dict[term].append([path, idx, tweet_id, local_dict[term][0], local_dict[term][1]])
-
-                elif 'o' <= term[0].lower() <= 's':
-                    if term not in self.os_post_dict:
-                        self.os_post_dict[term] = [[path, idx, tweet_id, local_dict[term][0], local_dict[term][1]]]
-                    else:
-                        self.os_post_dict[term].append([path, idx, tweet_id, local_dict[term][0], local_dict[term][1]])
-
-                elif 't' <= term[0].lower() <= 'z':
-                    if term not in self.tz_post_dict:
-                        self.tz_post_dict[term] = [[path, idx, tweet_id, local_dict[term][0], local_dict[term][1]]]
-                    else:
-                        self.tz_post_dict[term].append([path, idx, tweet_id, local_dict[term][0], local_dict[term][1]])
-
-                else:
-                    if term not in self.else_post_dict:
-                        self.else_post_dict[term] = [[path, idx, tweet_id, local_dict[term][0], local_dict[term][1]]]
-                    else:
-                        self.else_post_dict[term].append(
-                            [path, idx, tweet_id, local_dict[term][0], local_dict[term][1]])
+    def update_post_dict(self, tweet_id, local_dict,term_dict,tweet_date):
+        """
+        update the post dict
+        :param tweet_id: tweet ID int
+        :param local_dict: dict hold the loction
+        :param term_dict: dict hold frequency
+        :param tweet_date:
+        :return:
+        """
+        max_tf=max(term_dict.values())
+        for term in term_dict:
+            tf = term_dict[term] / max(term_dict.values())
+            if term not in self.post_dict:
+                self.post_dict[term] = [[tweet_id, term_dict[term] , tf ,local_dict[term][1],len(term_dict),max_tf,tweet_date]] #[ tweetID,trem preq,tf,term location,num uniqe terms in tweet,max_tf,date]
+            else:
+                self.post_dict[term].append([tweet_id, term_dict[term] , tf ,local_dict[term][1],len(term_dict),max_tf,tweet_date])
 
     def get_global_dict(self):
-        return self.global_dict
+        dict = self.global_dict
+        self.global_dict={}
+        return dict
+
+    def get_posting_dict(self):
+        dict =self.post_dict
+        self.post_dict={}
+        return dict
+
+    def sub_by_upper(self,text):
+        """
+        cut long word to lst that the first word start with upper
+        :param text:long word
+        :return: lst  that the first word start with uppe
+        """
+        parseList=[]
+        tmp=[]
+        word=""
+        for i in range(len(text)):
+            if text[i].isupper():
+              tmp.append(i)
+        for i in range(len(tmp)-1):
+            word=text[tmp[i]:tmp[i+1]]
+            parseList.append(word.lower())
+        if(len(tmp)>0):
+            text=text[tmp[-1]:]
+            parseList.append(text.lower())
+        return parseList
+
+    def update_entity_dict(self, term):
+        """
+        update num of show of the entity
+        :param term:
+        :return:
+        """
+        if term in self.tmp_for_entites.keys():
+            self.tmp_for_entites[term] += 1
+        else:
+            self.tmp_for_entites[term] = 1
+
+    def find_entities(self, tokenized_text):
+        """
+        if the function recognize up 2 word start with upper
+        :param tokenized_text: list after tokenized
+        :return:
+        """
+
+        UPPER_letter = False
+        tmp_entity = ""
+        for idx, word in enumerate(tokenized_text):
+            if len(word)<1:
+                continue
+            elif len(tmp_entity.split()) >= 2:
+                self.update_entity_dict(tmp_entity)
+                tmp_entity = ""
+                UPPER_letter = False
+            elif word[0].isupper() and UPPER_letter == True:
+                tmp_entity += " " + word
+                if (idx == len(tokenized_text) - 1):
+                    self.update_entity_dict(tmp_entity)
+            elif word[0].isupper() and UPPER_letter == False:
+                UPPER_letter = True
+                tmp_entity += word
+
+            else:
+                tmp_entity = ""
+
+    def tokenized_parse(self, full_text):
+        """
+
+        :param full_text: the original text
+        :return: list of term without stop words+@term+ #terms without emojify
+        """
+        full_text = self.deEmojify(full_text)
+        tokenized_text = full_text.split(' ')
+        tokenized_text_copy=[]
+        for term in tokenized_text:
+            tokenized_text_copy.append(term)
+
+        for i in tokenized_text:
+            if i.lower() in self.stop_words or i.startswith("\n") or i.startswith("https") or len(i)<2:#remove from original
+                tokenized_text_copy.remove(i)
+                continue
+            idx = tokenized_text_copy.index(i)
+            if '.' in i:
+                tokenized_text_copy[idx] = tokenized_text_copy[idx].replace(".", '')
+            if ',' in i:
+                tokenized_text_copy[idx] = tokenized_text_copy[idx].replace(".", '')
+            tokenized_text_copy[idx]=self.extand_contractions(tokenized_text_copy[idx].lower())
+            tokenized_text_copy[idx]=self.currency_parse(tokenized_text_copy[idx].upper())
+
+
+        tokenized_text=tokenized_text_copy
+        # save #tag
+        tokenized_text = self.Hashtags_parse(tokenized_text)
+        # save numbers end with M K B
+        tokenized_text = self.fix_number(tokenized_text)
+        # save num%
+        tokenized_text = self.percent_parse(tokenized_text)
+        # save entity
+        self.find_entities(tokenized_text)
+        return tokenized_text
+
+    def get_entity_dict(self):
+        dict =self.entities
+        self.entities={}
+        return dict
+
+
+
+
+
+

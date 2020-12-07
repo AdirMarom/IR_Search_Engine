@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-
+from pathlib import Path
 
 class ReadFile:
     def __init__(self, corpus_path):
@@ -16,3 +16,14 @@ class ReadFile:
         full_path = os.path.join(self.corpus_path, file_name)
         df = pd.read_parquet(full_path, engine="pyarrow")
         return df.values.tolist()
+
+    def find_paths(self):
+        doc_list=[]
+        entries = Path(self.corpus_path)
+        for entry in entries.iterdir():
+            if (entry.is_dir()):
+                for inner_entry in entry.iterdir():
+                    if (Path(inner_entry).suffix == '.parquet'):
+                        doc_list.append(inner_entry.parent.name+"\\"+inner_entry.name)
+
+        return doc_list
