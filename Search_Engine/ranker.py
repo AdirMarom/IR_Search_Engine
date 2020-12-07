@@ -1,16 +1,38 @@
+import math
 class Ranker:
     def __init__(self):
         pass
 
     @staticmethod
-    def rank_relevant_doc(relevant_doc):
+    def rank_relevant_doc(relevant_doc,query_len=0):
         """
-        This function provides rank for each relevant document and sorts them by their scores.
-        The current score considers solely the number of terms shared by the tweet (full_text) and query.
-        :param relevant_doc: dictionary of documents that contains at least one term from the query.
-        :return: sorted list of documents by score
+        this function rank the relavant docs by cosSim method
+        :param relevant_doc: a tuple with data about the terms in the query
+        :param query_len: the length of the query
+        :return: sorted list of tweetID ,sorted by rank--> cosSim
         """
-        return sorted(relevant_doc.items(), key=lambda item: item[1], reverse=True)
+        docs_dict = {}
+        sum_Wiq = relevant_doc[1]
+        count_terms = relevant_doc[2]
+        relevant_doc=relevant_doc[0]
+        for term in relevant_doc:
+            numShowsInQuery = count_terms[term.lower()]
+            for tweet in relevant_doc[term]:
+                numTweet=tweet[0]
+                tf=tweet[1]
+                idf=tweet[2]
+                if (numTweet not in docs_dict):
+                    docs_dict[numTweet] = [tf * idf * numShowsInQuery, (tf * idf) ** 2]
+                else:
+                    docs_dict[numTweet] = [docs_dict[numTweet][0] + (tf * idf*numShowsInQuery),
+                                   docs_dict[numTweet][1] + ((tf * idf) ** 2)]
+
+        doc_lst = []
+        for doc in docs_dict:
+            cosSim = (docs_dict[doc][0]) / (math.sqrt(docs_dict[doc][1] * sum_Wiq))
+            doc_lst.append((doc, cosSim))
+        return sorted(doc_lst, key=lambda x: x[1] ,reverse=True)
+
 
     @staticmethod
     def retrieve_top_k(sorted_relevant_doc, k=1):
@@ -21,3 +43,6 @@ class Ranker:
         :return: list of relevant document
         """
         return sorted_relevant_doc[:k]
+
+
+

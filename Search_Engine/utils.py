@@ -1,3 +1,4 @@
+import json
 import pickle
 
 
@@ -20,3 +21,21 @@ def load_obj(name):
     """
     with open(name + '.pkl', 'rb') as f:
         return pickle.load(f)
+
+def load_inverted_index(output_path=False):
+    files_names=['else','a',"bc",'d','e','fg','h','i','jm','n','o','pq','r','s','t','u','vz']
+    dict={}
+    try:
+        for word in files_names:
+            inv_dict=open_inverted(word+'\\'+word+'0_inverted_idx.json')
+            for term in inv_dict:
+                dict[term]=inv_dict[term]
+    except:
+        print("can't open a inverted file in utils")
+    return dict
+
+
+def open_inverted(path):
+    with open("inv_dicts\\" + path) as infile:
+        inv_dict = json.load(infile)
+    return inv_dict
